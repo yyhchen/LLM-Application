@@ -5,3 +5,5 @@ ChatGLM2-6B/
 chatglm2-6b-int4/
 chatglm26b/
 embedtext2vec/
+.gitignore
+get_source.ipynb
