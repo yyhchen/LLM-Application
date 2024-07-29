@@ -1,4 +1,8 @@
-# ChatGLM2-6b
+# LLM
+
+基于主流大模型做一些应用
+
+---
 
 基于 langchain + chroma 做本地知识库问答      
 
