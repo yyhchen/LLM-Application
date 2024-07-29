@@ -7,3 +7,4 @@ chatglm26b/
 embedtext2vec/
 .gitignore
 get_source.ipynb
+debug.ipynb
