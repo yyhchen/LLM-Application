@@ -4,6 +4,8 @@
 
 ---
 
-基于 langchain + chroma 做本地知识库问答      
 
+## [langchain_QA](https://github.com/yyhchen/LLM-Application/tree/main/langchain_QA)
+
+基于chatglm2-6b + langchain + chroma 做本地知识库问答(RAG)      
 - [本地知识库来源](https://github.com/yyhchen/Notes/tree/main/NLP%20review)
