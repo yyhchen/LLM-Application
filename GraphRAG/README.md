@@ -80,9 +80,9 @@
     ```sh
     python -m graphrag.index --root ./ragtest
     ```
-<img src=''>
+<img src='https://github.com/yyhchen/LLM-Application/blob/main/assets/graphrag_indexing_pipeline.png'>
 
-<img src=''>
+<img src='https://github.com/yyhchen/LLM-Application/blob/main/assets/completed_success.png'>
 
 
     - d. running query engine
@@ -94,7 +94,7 @@
     --method global \
     "What are the top themes in this story?"
     ```
-<img src=''>
+<img src='https://github.com/yyhchen/LLM-Application/blob/main/assets/graphrag_global_search.png'>
 
     局部搜索(local search):
     ```sh
@@ -103,7 +103,7 @@
     --method local \
     "Who is Scrooge, and what are his main relationships?"
     ``
-<img src=''>
+<img src='https://github.com/yyhchen/LLM-Application/blob/main/assets/image.png'>
 
 <br>
 <br>
