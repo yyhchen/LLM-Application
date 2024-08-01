@@ -13,3 +13,9 @@
 
 基于Qwen2-0.5B-Instruct 提升 RAG 做法律知识问答
 - [知识来源](https://huggingface.co/datasets/cfa532/CHLAWS)
+
+
+
+## [GraphRAG](https://github.com/yyhchen/LLM-Application/tree/main/GraphRAG)
+
+基于[官方GraphRAG](https://microsoft.github.io/graphrag/posts/get_started/)做的简单演示，并使用 `neo4j` 可视化知识图谱；演示的数据使用的是[text.txt](https://github.com/yyhchen/LLM-Application/blob/main/GraphRAG/text.txt) 
