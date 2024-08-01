@@ -42,6 +42,6 @@ driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 <br>
 <br>
 
-后续导入数据 详情在 [neo4j_display.ipynb](), 导入成功后打开网页即可看到生成的知识图谱
+后续导入数据 详情在 [neo4j_display.ipynb](https://github.com/yyhchen/LLM-Application/blob/main/GraphRAG/neo4j_display/neo4j_display.ipynb), 导入成功后打开网页即可看到生成的知识图谱
 
 <img src='https://github.com/yyhchen/LLM-Application/blob/main/assets/graphrag_neo4j_display.png'>
