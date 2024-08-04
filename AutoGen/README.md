@@ -16,7 +16,7 @@
 
 AutoGen 是一个用于构建和训练基于大型语言模型（LLM）的对话代理的框架。它允许用户通过定义一组任务和一组代理来构建一个对话系统，并使用 LLM 来训练代理之间的交互，以实现特定的任务目标。
 
-<img src='https://github.com/yyhchen/LLM-Application/tree/main/assets/autogen_intro.png'>
+<img src='https://github.com/yyhchen/LLM-Application/blob/main/assets/autogen_intro.png'>
 
 
 <br>
