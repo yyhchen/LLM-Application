@@ -63,3 +63,26 @@ bash openai_api.sh
 
 [autogen.ipynb](https://github.com/yyhchen/LLM-Application/tree/main/AutoGen/autogen.ipynb) 改编自 [AutoGen官网案例](https://microsoft.github.io/autogen/docs/topics/groupchat/customized_speaker_selection) 
 
+
+<br>
+<br>
+
+
+## 🔍 RAG in AutoGen 
+
+AutoGen 支持 RAG，通过在 LLM 的输入中添加来自外部数据源的文本片段，以增强模型的生成能力。
+
+<br>
+
+### envs
+```bash
+# 加 -q 控制台没有安装信息
+pip install pyautogen[retrievechat] langchain "chromadb<0.4.15" -q
+```
+
+<br>
+
+
+### 案例
+
+[autogen_rag.ipynb](https://github.com/yyhchen/LLM-Application/tree/main/AutoGen/autogen_rag.ipynb)
