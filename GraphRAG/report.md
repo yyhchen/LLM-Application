@@ -7,6 +7,14 @@
 
 [data](/GraphRAG/input/)：摘选自 [Tencent Research Institute](https://www.tisi.org/) 的最新十篇研究报告
 
+<br>
+
+三个独立的环境 (建议用 `python -v venv xxx`):
+
+- graphrag
+- embeddings model
+- LLM model
+
 
 <br>
 <br>
@@ -65,5 +73,151 @@
 
 
 > 目前发现，只要在一个容器内启动过 graphrag，再次 indexing数据一定会出现这个bug！！！暂时不懂这是为什么，跟模型规模貌似不是直接关系
+
+
+<br>
+
+
+`indexing` 成功提取数据后的结果（重新开的容器全部重新开始运行的）如下图所示：
+
+![indexing result](/assets/graphrag_indexing_result.png)
+
+
+<br>
+<br>
+<br>
+
+### Command Line Query
+
+- global search
+- local search
+
+
+#### 1. global search
+
+```bash
+python -m graphrag.query --root ./ragtest --method global "国企数字化转型面临的挑战有哪些？"
+```
+
+
+结果如下图所示：
+![global search result](/assets/graphrag_global_result.png)]
+
+
+<br>
+
+
+#### 2. local search
+
+```bash
+python -m graphrag.query --root ./ragtest --method local "国企数字化转型面临的挑战有哪些？"
+```
+
+结果如下图所示：
+
+![local search result](/assets/graphrag_local_result.png)
+
+
+
+<br>
+<br>
+<br>
+
+
+
+### Notebook Query
+
+- global search
+- local search
+
+
+#### 1. global search
+
+[global_search.ipynb](/GraphRAG/notebook/global_search.ipynb)
+
+运行部分结果如下图所示：
+
+
+
+<br>
+
+
+#### 2. local search
+
+[local_search.ipynb](/GraphRAG/notebook/local_search.ipynb)
+
+
+运行部分结果如下图所示：
+
+
+
+
+<br>
+<br>
+<br>
+
+
+执行 查询后， 会在项目文件同级上产生一个 `lancedb` 文件夹，貌似放的是查询的数据, 如下图所示：
+
+
+
+
+
+
+
+<br>
+<br>
+<br>
+
+
+
+## 🪫 Extra
+
+
+### 部署优化 (超参数，非算子类优化)
+
+> 量化
+
+利用 `vLLM` 部署本地模型的时候，`Qwen2-72B-Instruct` A800-80G 单卡，可以考虑用 `int8` 精度，这样单卡可以使用
+
+<br>
+
+> 加速
+
+小模型加速可以使用更大的缓存 部署 API 时加大 `--gpu-memory-utilization` 的数值（默认是0.9， 我实验用的0.3），但是这里要考虑显存的问题。加大缓存可以使得 indexing builder 加速
+
+<br>
+
+> 分布式（多卡）
+
+启动部署 API 的时候，加上参数 `--tensor-parallel-size 2` 使用双卡部署，`Qwen2-72B-Instruct`部署 `FP16` 推荐的是两张 A800-80G
+
+
+<br>
+<br>
+
+
+### GraphRAG 优化 (通过 settings.yaml 等文件配置，非源码优化)
+
+
+> prompts/entity_extraction.txt
+
+精简 `entity_extraction.txt` 的prompts内容,减少 LLM 输入的 tokens 数量（但不容易尝试, 也可能会降低精度等问题）
+
+<br>
+
+
+> 增加 `chunk` 大小
+
+在 `settings.yaml` 中增加 `chunk` 大小，默认是 1200, `overlap` 默认是 100。
+
+```yaml
+chunks:
+  size: 1200
+  overlap: 100
+  group_by_columns: [id]
+```
+
+
 
 
