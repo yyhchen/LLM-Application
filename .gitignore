@@ -8,3 +8,4 @@ embedtext2vec/
 .gitignore
 get_source.ipynb
 debug.ipynb
+**/*/chroma_data/
