@@ -1,3 +1,5 @@
+import chainlit as cl
+from chainlit.input_widget import Select
 from openai import AsyncOpenAI
 import chainlit as cl
 from chainlit.input_widget import Select, Switch, Slider
@@ -17,6 +19,16 @@ settings = {
     "temperature": 0.1,  # 降低温度以减少重复
     "top_p": 0.9,        # 调整 top_p 以控制输出多样性
 }
+
+
+@cl.password_auth_callback
+def auth_callback(username: str, password: str):
+    # Fetch the user matching username from your database
+    # and compare the hashed password with the value stored in the database
+    if (username, password) == ("yhchen", "123456"):
+        return cl.User(identifier="彭于晏")
+    else:
+        return None
 
 
 """
@@ -95,11 +107,15 @@ async def chat_profile():
 """
 @cl.on_chat_start
 # 对话模板
-def start_chat():
+async def on_chat_start():
+    app_user = cl.user_session.get("user")
+    await cl.Message(f"Hello {app_user.identifier}").send()
+
     cl.user_session.set(
         "message_history",
         [{"role": "system", "content": "You are a helpful assistant."}],
     )
+    
 
 
 """
