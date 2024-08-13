@@ -9,3 +9,4 @@ embedtext2vec/
 get_source.ipynb
 debug.ipynb
 **/*/chroma_data/
+**/.env
