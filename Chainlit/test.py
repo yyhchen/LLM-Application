@@ -26,7 +26,7 @@ def auth_callback(username: str, password: str):
     # Fetch the user matching username from your database
     # and compare the hashed password with the value stored in the database
     if (username, password) == ("yhchen", "123456"):
-        return cl.User(identifier="彭于晏")
+        return cl.User(identifier=username, metadata={"role": username, "provider": "credentials"})
     else:
         return None
 
