@@ -219,5 +219,153 @@ chunks:
 ```
 
 
+<br>
+<br>
+<br>
 
 
+
+## ❌ 错误总结
+
+### 多卡vLLM部署出现的问题
+
+双卡部署 `Qwen2-72B-Instruct` 很大概率出现下面错误：
+```shell
+vllm.engine.async_llm_engine.AsyncEngineDeadError: Background loop has errored already
+```
+
+以上错误可通过vLLM终端日志查看, 可能原因是请求量太大和需要的吞吐量太大处理不了，也可能是 显存不够 (未验证 [issue](https://github.com/vllm-project/vllm/issues/5060)) 
+
+
+我的启动配置是:
+```bash
+python -m vllm.entrypoints.openai.api_server --model /root/private_data/models/Qwen/Qwen2-72B-Instruct --served-model-name Qwen2-72B-Instruct --max-model-len 14336 --gpu-memory-utilization 0.98 --tensor-parallel-size 2 
+
+```
+
+> 吞吐量：5~6 token/s, 非常慢～
+
+**可能的解决方法：** 重启多几次有几率成功
+
+
+<br>
+<br>
+<br>
+
+
+
+### 最后创建 create_final_communities_report.parquet 文件出现问题
+
+可能是报显存或者 吞吐量太低导致的。
+
+
+
+
+<br>
+<br>
+<br>
+
+
+
+# 细节分析
+
+## 根据 《霸王别姬》 做 GraphRAG 详细报告分析
+
+> ‼️ 前提：GraphRAG的查询分为`global-search` 和 `local-search`。
+>
+> `global-search` 方法通过以 map-reduce 方式搜索所有 A生成的社区报告来生成答案。这是一种资源密集型方法，需要LLM支持的context window足够大，最好是32K的模型，但通常可以很好地回答需要了解整个数据集的问题。
+>
+> `local-search` 方法通过将AI 提取到知识图谱中的相关数据与原始文档的文本块相结合来生成答案，此方法适用于需要了解文档中提到的特定实体的问题
+
+
+
+<br>
+
+这里模仿官方的例子写了两个问题来分别进行 `local-search` 和 `global-search`:
+
+1. `local-search`: "谁是程蝶衣？他的主要关系是什么？"
+2. `global-search`: "这篇小说讲了一个什么故事？"
+
+
+<br>
+<br>
+
+### ⌨️ 使用 CLI 命令行进行查询
+
+> global search
+
+```
+python -m graphrag.query --root . --method global "这篇小说讲了一个什么故事？"
+```
+
+结果如下图所示：
+
+![global search result](/assets/concubine_global_search.png)
+
+
+
+<br>
+<br>
+
+> local search
+
+```
+python -m graphrag.query --root . --method local "谁是程蝶衣？他的主要关系是什么？"
+```
+
+结果如下图所示：
+
+![local search result](/assets/concubine_local_search.png)
+
+
+<br>
+
+
+结论: 可以看到效果还是很不错的。
+
+
+
+<br>
+<br>
+
+
+### 🏞 结合 chainlit + graphrag-server 做 webui 查询
+
+首先是 `local search`：
+
+![graphrag server local search](/assets/concubine_server_local_search.png)
+
+
+完全没效果，看了下日志：
+
+![server local log](/assets/concubine_server_local_search_log.png)
+
+我猜测可能的原因是，`graphrag-server` 中 对 `local.search` 的实现有bug，因为在 `neo4j` 的 `_entity_` 里面确实也没看到 `程蝶衣` 这个实体，`程蝶衣` 是 `组织`标签里, 如下图所示。 但奇怪的是为什么官方的 CLI 却能只找到答案呢？
+
+![neo4j entity](/assets/concubine_neo4j_entity_1.png)
+
+
+奇怪的是，发现了大类 `_entity_` 也包含了 `程蝶衣` ,如下图:
+
+![neo4j entity2](/assets/concubine_neo4j_entity_2.png)
+
+
+那么，还是回到刚刚，bug 在 `graph-server` 处理 `local-search` 的代码里面.
+
+
+<br>
+
+
+接下来是 `global search`:`
+
+![graphrag server global search](/assets/concubine_server_global_search.png)
+
+
+可以看到 `global search` 在 `graphrag-server` 代码中还是没有失效的，我们还可以从 日志 中证明这一点，日志部分节选如下图所示.
+
+![server global log1](/assets/concubine_server_global_search_log1.png)
+
+![server global log2](/assets/concubine_server_global_search_log2.png)
+
+
+我们还可以从日志中获取的信息是，答案确实是 通过 `map-reduce` 的方式进行搜索，然后通过模型总结生成答案的。
