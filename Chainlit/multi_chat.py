@@ -13,10 +13,15 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.indexes import SQLRecordManager, index
+from CustomEmbeddings import BGEEmbeddings
 
 DATA_PATH = './data'
-EMBED_MODEL_PATH = '/root/private_data/models/BAAI/bge-m3'
-
+EMBED_MODEL_PATH = '/home/yhchen/huggingface_model/BAAI/bge-m3'
+MODEL_BASE_URL = "http://localhost:8080/v1"
+MODEL_API_KEY = "token-qwen2"
+MODEL_NAME = "Qwen2"
+EMBEDDING_MODEL_NAME = "bge-m3"
+EMBEDDING_BASE_ULR = "http://localhost:8200/v1/embeddings"
 
 """
 ############################################################################################################
@@ -25,8 +30,8 @@ EMBED_MODEL_PATH = '/root/private_data/models/BAAI/bge-m3'
 """
 def LLM_Client():
     client = AsyncOpenAI(
-        api_key="token-qwen2", # vllm
-        base_url="http://0.0.0.0:9999/v1",
+        api_key=MODEL_API_KEY, # vllm
+        base_url=MODEL_BASE_URL,
     )
     settings = {
         # "model": "Qwen2-0.5B-Instruct",   # 利用chat_profile 指定模型
@@ -38,11 +43,15 @@ def LLM_Client():
 
 
 def Process_Data_Create_Retriever(data_path: str, embed_model_path: str):
+    """
+        处理数据, 并创建 retriever(检索器) 
+    """
     loader = DirectoryLoader(data_path, glob="*.txt")
     docs = loader.load()
     documents = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100).split_documents(docs)
 
-    embeddings = HuggingFaceBgeEmbeddings(model_name=embed_model_path)
+    # embeddings = HuggingFaceBgeEmbeddings(model_name=embed_model_path)
+    embeddings = BGEEmbeddings(base_url=EMBEDDING_BASE_ULR, model_name=EMBEDDING_MODEL_NAME)
 
     vectordb = Chroma.from_documents(documents=documents, embedding=embeddings, collection_name="mydata")
     retriever = vectordb.as_retriever()
@@ -155,9 +164,9 @@ def LC_Chat_Model():
         model chat of RAG (based langchain)
     """
     model = ChatOpenAI(
-            base_url="http://0.0.0.0:9999/v1",
-            api_key = 'token-qwen2',
-            model = 'Qwen2',
+            base_url= MODEL_BASE_URL,
+            api_key = MODEL_API_KEY,
+            model = MODEL_NAME,
             streaming=True,
             )
     prompt = ChatPromptTemplate.from_messages(
@@ -179,9 +188,9 @@ def RAG_Chat_Model(data_path, embed_mode_path):
         RAG model chat
     """
     model = ChatOpenAI(
-            base_url="http://0.0.0.0:9999/v1",
-            api_key = 'token-qwen2',
-            model = 'Qwen2',
+            base_url= MODEL_BASE_URL,
+            api_key = MODEL_API_KEY,
+            model = MODEL_NAME,
             streaming=True,
             )
     
@@ -222,7 +231,13 @@ def GraphRAG_Local_Model():
 
 """
 ############################################################################################################
+    
+                                ==================
+                                = Chainlit 装饰器 =   
+                                ==================
+
     聊天框 功能, 模板, langchain 集成 等 (新增模型需要添加)
+
 ############################################################################################################
 """
 @cl.on_chat_start
@@ -343,7 +358,13 @@ async def RAG_Chat_Message(message):
 
 """
 ############################################################################################################
+    
+                                ==================
+                                = Chainlit 装饰器 =   
+                                ==================  
+
     响应的消息传递到 WebUI 上 (新增模型需要添加)
+
 ############################################################################################################
 """
 @cl.on_message
