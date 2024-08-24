@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional, Union, Iterable, Tuple, Set, Sequence
 import requests
 
-class CustomEmbeddings(BaseModel):
+class BGEEmbeddings(BaseModel):
     """Custom embedding model integration using your own API."""
 
     model: str = "bge-m3"
