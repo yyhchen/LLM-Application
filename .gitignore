@@ -12,3 +12,6 @@ debug.ipynb
 **/.env
 **/bug.py
 **/use.md
+**/server
+**/.vscode
+**/data
