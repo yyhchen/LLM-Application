@@ -16,3 +16,4 @@ debug.ipynb
 **/.vscode
 **/data
 **/*.log
+*.sql
