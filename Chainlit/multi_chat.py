@@ -8,18 +8,26 @@ from openai import AsyncOpenAI
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+# from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.schema.runnable import RunnablePassthrough
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.indexes import SQLRecordManager, index
 from CustomEmbeddings import BGEEmbeddings
 
+from langchain_community.tools.ddg_search import DuckDuckGoSearchRun
+from langchain.tools.retriever import create_retriever_tool
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain import hub
+import os
+
+os.environ["LANGCHAIN_API_KEY"] = ''
+
 DATA_PATH = './data'
 EMBED_MODEL_PATH = '/home/yhchen/huggingface_model/BAAI/bge-m3'
-MODEL_BASE_URL = "http://localhost:8080/v1"
-MODEL_API_KEY = "token-qwen2"
-MODEL_NAME = "Qwen2"
+MODEL_BASE_URL = "" # http://localhost:8080/v1
+MODEL_API_KEY = ""   # token-qwen2
+MODEL_NAME = ""    # Qwen2
 EMBEDDING_MODEL_NAME = "bge-m3"
 EMBEDDING_BASE_ULR = "http://localhost:8200/v1/embeddings"
 
@@ -34,7 +42,7 @@ def LLM_Client():
         base_url=MODEL_BASE_URL,
     )
     settings = {
-        # "model": "Qwen2-0.5B-Instruct",   # 利用chat_profile 指定模型
+        "model": MODEL_NAME, 
         "max_tokens": 512,
         "temperature": 0.1,  # 降低温度以减少重复
         "top_p": 0.9,        # 调整 top_p 以控制输出多样性
@@ -132,14 +140,14 @@ async def chat_profile():
             icon="/public/qwen.png",
         ),
         cl.ChatProfile(
+            name="Agent",
+            markdown_description="The underlying LLM model is **GLM4**.",
+            icon="/public/google.png",
+        ),
+        cl.ChatProfile(
             name="GraphRAG-latest-global",
             markdown_description="The underlying LLM model is **Phi-3**.",
             icon="/public/microsoft.png",
-        ),
-        cl.ChatProfile(
-            name="20240815-122404-local",
-            markdown_description="The underlying LLM model is **Gemma2**.",
-            icon="/public/google.png",
         ),
         cl.ChatProfile(
             name="20240815-122404-global",
@@ -159,6 +167,7 @@ async def chat_profile():
     @cl.on_chat_start 中 不同功能模型封装 (新增模型需要添加)
 ############################################################################################################
 """
+######################################################################################
 def LC_Chat_Model():
     """
         model chat of RAG (based langchain)
@@ -182,7 +191,7 @@ def LC_Chat_Model():
 
     return runnable
 
-
+######################################################################################
 def RAG_Chat_Model(data_path, embed_mode_path):
     """
         RAG model chat
@@ -220,12 +229,54 @@ def RAG_Chat_Model(data_path, embed_mode_path):
         )
     return runnable
 
-
+######################################################################################
 def GraphRAG_Local_Model():
     """
         local search of GraphRAG
     """
+
     pass
+
+######################################################################################
+def Agent_Chat_Model():
+    """
+        agent chat
+        tools: search, retriever
+    """
+
+    model = ChatOpenAI(
+            base_url= MODEL_BASE_URL,
+            api_key = MODEL_API_KEY,
+            model = MODEL_NAME,
+            streaming=True,
+            )
+
+    # tools prepare
+    search = DuckDuckGoSearchRun(max_results=2)
+    # retriever = Process_Data_Create_Retriever(data_path, embed_mode_path)
+
+    # create retriever_tools
+    # retriever_tool = create_retriever_tool(
+    #     retriever, 
+    #     name="documents search",
+    #     description="search for info about documents data"
+    # )
+
+    # tools = [search, retriever_tool]
+    tools = [search]
+
+    # prompt = hub.pull("hwchase17/structured-chat-agent")  # 结构化的prompt，有agent运行过程 (用create_structured_chat_agent)
+    prompt = hub.pull("hwchase17/openai-functions-agent")   # 直接返回结果
+
+    # create agent
+    # agent = create_structured_chat_agent(llm=model, tools=tools, prompt=prompt)
+    # agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True, max_iterations=3)
+
+    agent = create_tool_calling_agent(llm=model, tools=tools, prompt=prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools)
+
+    return agent_executor
+    
 
 
 
@@ -254,9 +305,16 @@ async def on_chat_start():
             "message_history",
             [{"role": "system", "content": "You are a helpful assistant."}],
         )
+
     elif (model_name == "Qwen2-RAG"):
         runnable = RAG_Chat_Model(DATA_PATH, EMBED_MODEL_PATH)
         cl.user_session.set("runnable", runnable)
+
+    elif (model_name == "Agent"):
+        agent_executor = Agent_Chat_Model()
+        cl.user_session.set("agent_executor", agent_executor)
+
+    elif (model_name == "GraphRAG-latest-global"):
         pass
 
 
@@ -266,6 +324,7 @@ async def on_chat_start():
     @cl.on_message 中 不同功能模型封装  (新增模型需要添加)
 ############################################################################################################
 """
+######################################################################################
 async def LC_Chat_Message(message):
     """
         使用 langchain 实现的聊天对话
@@ -283,13 +342,13 @@ async def LC_Chat_Message(message):
     await msg.send()
 
 
-
+######################################################################################
 async def Chat_Model_Message(message):
     """
         original model chat message
     """
     # 获取聊天配置中指定的模型
-    chat_profile = cl.user_session.get("chat_profile")
+    # chat_profile = cl.user_session.get("chat_profile")
 
     message_history = cl.user_session.get("message_history")
     message_history.append({"role": "user", "content": message.content})
@@ -300,7 +359,7 @@ async def Chat_Model_Message(message):
     client, settings = LLM_Client()
 
     stream = await client.chat.completions.create(
-        model = chat_profile, messages=message_history,stream=True, **settings
+        messages=message_history, stream=True, **settings
     )
 
     async for part in stream:
@@ -311,7 +370,7 @@ async def Chat_Model_Message(message):
     await msg.update()
 
 
-
+######################################################################################
 async def RAG_Chat_Message(message):
     """
         RAG chat message 
@@ -354,6 +413,28 @@ async def RAG_Chat_Message(message):
         await msg.stream_token(chunk)
 
     await msg.send()
+
+
+######################################################################################
+async def Agent_Chat_Message(message):
+    """
+        Agent chat message
+    """
+    agent_executor = cl.user_session.get("agent_executor")  # type: Runnable
+
+    if agent_executor is None:
+        await cl.Message(content="Agent executor is not initialized. Please try again later.").send()
+
+    msg = cl.Message(content="")
+
+    input_data = {"input": message.content}
+    result = agent_executor.invoke(input_data)['output']
+    
+    # 流式输出
+    for char in result:
+        await msg.stream_token(char)
+
+    await msg.send()
     
 
 """
@@ -380,4 +461,7 @@ async def on_message(message: cl.Message):
 
     elif (model_name == "Qwen2-RAG"):
         await RAG_Chat_Message(message)
+
+    elif (model_name == "Agent"):
+        await Agent_Chat_Message(message)
         
