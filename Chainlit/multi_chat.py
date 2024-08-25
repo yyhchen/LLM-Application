@@ -20,6 +20,7 @@ from langchain.tools.retriever import create_retriever_tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain import hub
 import os
+from langchain.memory import ConversationBufferMemory
 
 os.environ["LANGCHAIN_API_KEY"] = ''
 
@@ -268,12 +269,15 @@ def Agent_Chat_Model():
     # prompt = hub.pull("hwchase17/structured-chat-agent")  # 结构化的prompt，有agent运行过程 (用create_structured_chat_agent)
     prompt = hub.pull("hwchase17/openai-functions-agent")   # 直接返回结果
 
+    # 添加记忆 （即 历史对话信息）
+    history = ConversationBufferMemory(memory_key="chat_history", return_messages=True, output_key="output")
+
     # create agent
     # agent = create_structured_chat_agent(llm=model, tools=tools, prompt=prompt)
     # agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True, max_iterations=3)
 
     agent = create_tool_calling_agent(llm=model, tools=tools, prompt=prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, memory=history)
 
     return agent_executor
     
