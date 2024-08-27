@@ -17,3 +17,7 @@ debug.ipynb
 **/data
 **/*.log
 *.sql
+**/.cache
+**/*.db
+**/local
+**/docker
