@@ -21,16 +21,20 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain import hub
 import os
 from langchain.memory import ConversationBufferMemory
+import json
 
-os.environ["LANGCHAIN_API_KEY"] = ''
+with open('config.json', 'r') as f:
+    config = json.load(f)
+
+os.environ["LANGCHAIN_API_KEY"] = config["LANGCHAIN_API_KEY"]
 
 DATA_PATH = './data'
 EMBED_MODEL_PATH = '/home/yhchen/huggingface_model/BAAI/bge-m3'
-MODEL_BASE_URL = "" # http://localhost:8080/v1
-MODEL_API_KEY = ""   # token-qwen2
-MODEL_NAME = ""    # Qwen2
-EMBEDDING_MODEL_NAME = "bge-m3"
-EMBEDDING_BASE_ULR = "http://localhost:8200/v1/embeddings"
+MODEL_BASE_URL = config["BASE_URL"] # http://localhost:8080/v1
+MODEL_API_KEY = config["API_KEY"]   # token-qwen2
+MODEL_NAME = config["MODEL_ID"]
+EMBEDDING_MODEL_NAME = config["EMBEDDING_MODEL_NAME"]
+EMBEDDING_BASE_ULR = config["EMBEDDING_BASE_ULR"]
 
 """
 ############################################################################################################
@@ -151,7 +155,7 @@ async def chat_profile():
             icon="/public/microsoft.png",
         ),
         cl.ChatProfile(
-            name="20240815-122404-global",
+            name="GraphRAG-latest-local",
             markdown_description="The underlying LLM model is **Phi-3**.",
             icon="/public/microsoft.png",
         ),
@@ -192,6 +196,7 @@ def LC_Chat_Model():
 
     return runnable
 
+
 ######################################################################################
 def RAG_Chat_Model(data_path, embed_mode_path):
     """
@@ -230,13 +235,43 @@ def RAG_Chat_Model(data_path, embed_mode_path):
         )
     return runnable
 
+
 ######################################################################################
 def GraphRAG_Local_Model():
     """
         local search of GraphRAG
     """
+    # 里面的参数不能乱加 
+    model = AsyncOpenAI(
+        base_url="http://0.0.0.0:20213/v1",
+        api_key=MODEL_API_KEY,
+    )
+    settings = {
+        "model": "GraphRAG-latest-local", 
+        "max_tokens": 512,
+        "temperature": 0.1,  # 降低温度以减少重复
+        "top_p": 0.9,        # 调整 top_p 以控制输出多样性
+    }
+    return model, settings
 
-    pass
+
+######################################################################################
+def GraphRAG_Global_Model():
+    """
+        global search of GraphRAG
+    """
+    model = AsyncOpenAI(
+        base_url="http://0.0.0.0:20213/v1",
+        api_key=MODEL_API_KEY,
+    )
+    settings = {
+        "model": "GraphRAG-latest-global", 
+        "max_tokens": 512,
+        "temperature": 0.1,  # 降低温度以减少重复
+        "top_p": 0.9,        # 调整 top_p 以控制输出多样性
+    }
+    return model, settings
+
 
 ######################################################################################
 def Agent_Chat_Model():
@@ -319,8 +354,16 @@ async def on_chat_start():
         cl.user_session.set("agent_executor", agent_executor)
 
     elif (model_name == "GraphRAG-latest-global"):
-        pass
+        cl.user_session.set(
+            "message_history",
+            [{"role": "system", "content": "You are a helpful assistant."}],
+        )
 
+    elif (model_name == "GraphRAG-latest-local"):
+        cl.user_session.set(
+            "message_history",
+            [{"role": "system", "content": "You are a helpful assistant."}],
+        )
 
 
 """
@@ -441,6 +484,59 @@ async def Agent_Chat_Message(message):
     await msg.send()
     
 
+######################################################################################
+async def GraphRAG_Global_Model_Message(message):
+    """
+        graphrag global model chat message
+    """
+    # 获取聊天配置中指定的模型
+    # chat_profile = cl.user_session.get("chat_profile")
+
+    message_history = cl.user_session.get("message_history")
+    message_history.append({"role": "user", "content": message.content})
+
+    msg = cl.Message(content="")
+    await msg.send()
+
+    model, settings = GraphRAG_Global_Model()
+
+    stream = await model.chat.completions.create(
+        messages=message_history, stream=True, **settings
+    )
+
+    async for part in stream:
+        if token := part.choices[0].delta.content or "":
+            await msg.stream_token(token)
+
+    message_history.append({"role": "assistant", "content": msg.content})
+    await msg.update()
+
+
+######################################################################################
+async def GraphRAG_Local_Model_Message(message):
+    """
+        graphrag local model chat message
+    """
+
+    message_history = cl.user_session.get("message_history")
+    message_history.append({"role": "user", "content": message.content})
+
+    msg = cl.Message(content="")
+    await msg.send()
+
+    model, settings = GraphRAG_Local_Model()
+
+    stream = await model.chat.completions.create(
+        messages=message_history, stream=True, **settings
+    )
+
+    async for part in stream:
+        if token := part.choices[0].delta.content or "":
+            await msg.stream_token(token)
+
+    message_history.append({"role": "assistant", "content": msg.content})
+    await msg.update()
+
 """
 ############################################################################################################
     
@@ -468,4 +564,10 @@ async def on_message(message: cl.Message):
 
     elif (model_name == "Agent"):
         await Agent_Chat_Message(message)
+    
+    elif (model_name == "GraphRAG-latest-global"):
+        await GraphRAG_Global_Model_Message(message)
+    
+    elif (model_name == "GraphRAG-latest-local"):
+        await GraphRAG_Global_Model_Message(message)
         
