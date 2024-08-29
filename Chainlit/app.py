@@ -2,10 +2,14 @@ from openai import AsyncOpenAI
 import chainlit as cl
 from chainlit.input_widget import Select, Switch, Slider
 from typing import Optional
+import json
+
+with open('config.json', 'r') as f:
+    config = json.load(f)
 
 client = AsyncOpenAI(
-    api_key="vllm",
-    base_url="http://0.0.0.0:8080/v1",
+    api_key=config['API_KEY'],
+    base_url=config["BASE_URL"],
 )
 
 # Instrument the OpenAI client
@@ -70,12 +74,12 @@ async def chat_profile():
             icon="/public/qwen.png",
         ),
         cl.ChatProfile(
-            name="Gemma2",
+            name="glm-4-0520",
             markdown_description="The underlying LLM model is **Gemma2**.",
             icon="/public/google.png",
         ),
         cl.ChatProfile(
-            name="Phi-3",
+            name="GraphRAG-latest-global",
             markdown_description="The underlying LLM model is **Phi-3**.",
             icon="/public/microsoft.png",
         ),
