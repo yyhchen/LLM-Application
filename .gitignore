@@ -21,3 +21,7 @@ debug.ipynb
 **/*.db
 **/local
 **/docker
+**/tutorial/config.json
+**/config.json
+**/graphrag-server
+**/.chainlit
