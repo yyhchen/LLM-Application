@@ -22,6 +22,7 @@ from langchain import hub
 import os
 from langchain.memory import ConversationBufferMemory
 import json
+from zhipuai import ZhipuAI
 
 with open('config.json', 'r') as f:
     config = json.load(f)
@@ -150,6 +151,11 @@ async def chat_profile():
             icon="/public/google.png",
         ),
         cl.ChatProfile(
+            name="ImageGen",
+            markdown_description="The underlying LLM model is **GLM4**.",
+            icon="/public/google.png",
+        ),
+        cl.ChatProfile(
             name="GraphRAG-latest-global",
             markdown_description="The underlying LLM model is **Phi-3**.",
             icon="/public/microsoft.png",
@@ -243,7 +249,7 @@ def GraphRAG_Local_Model():
     """
     # 里面的参数不能乱加 
     model = AsyncOpenAI(
-        base_url="http://0.0.0.0:20213/v1",
+        base_url="http://localhost:20213/v1",
         api_key=MODEL_API_KEY,
     )
     settings = {
@@ -261,7 +267,7 @@ def GraphRAG_Global_Model():
         global search of GraphRAG
     """
     model = AsyncOpenAI(
-        base_url="http://0.0.0.0:20213/v1",
+        base_url="http://localhost:20213/v1",
         api_key=MODEL_API_KEY,
     )
     settings = {
@@ -315,6 +321,15 @@ def Agent_Chat_Model():
     agent_executor = AgentExecutor(agent=agent, tools=tools, memory=history)
 
     return agent_executor
+
+
+######################################################################################
+def Image_Gen_Model():
+    """
+        image gen
+    """
+    pass
+
     
 
 
@@ -364,6 +379,10 @@ async def on_chat_start():
             "message_history",
             [{"role": "system", "content": "You are a helpful assistant."}],
         )
+
+    elif (model_name == "ImageGen"):
+        client = ZhipuAI(api_key=config["API_KEY"])
+        cl.user_session.set("client", client)   
 
 
 """
@@ -537,6 +556,29 @@ async def GraphRAG_Local_Model_Message(message):
     message_history.append({"role": "assistant", "content": msg.content})
     await msg.update()
 
+
+async def Image_Gen_Message(message):
+    """
+        image gen model chat message
+    """
+    model = cl.user_session.get("client")
+
+    response = model.images.generations(
+        model="cogview-3", #填写需要调用的模型编码
+        prompt=message.content,
+    )
+
+    result_url = response.data[0].url
+
+    image = cl.Image(url=result_url, name="image1", display="inline")
+
+    await cl.Message(
+        content="",
+        elements=[image],
+    ).send()
+
+
+
 """
 ############################################################################################################
     
@@ -570,4 +612,8 @@ async def on_message(message: cl.Message):
     
     elif (model_name == "GraphRAG-latest-local"):
         await GraphRAG_Global_Model_Message(message)
+    
+    elif (model_name == "ImageGen"):
+        await Image_Gen_Message(message)
+
         
