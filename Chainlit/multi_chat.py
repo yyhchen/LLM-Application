@@ -153,8 +153,8 @@ async def chat_profile():
         ),
         cl.ChatProfile(
             name="InternVL2",
-            markdown_description="The underlying LLM model is **InternVL2-8B**.",
-            icon="/public/google.png",
+            markdown_description="The underlying LLM model is **InternVL2-1B**.",
+            icon="/public/opengvlab.png",
         ),
         cl.ChatProfile(
             name="ImageGen",
