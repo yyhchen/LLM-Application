@@ -26,3 +26,5 @@ debug.ipynb
 **/graphrag-server
 **/.chainlit
 **/*.pyc
+**/debug
+**/__pycache__
