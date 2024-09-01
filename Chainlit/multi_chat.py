@@ -23,6 +23,7 @@ import os
 from langchain.memory import ConversationBufferMemory
 import json
 from zhipuai import ZhipuAI
+import base64
 
 with open('config.json', 'r') as f:
     config = json.load(f)
@@ -148,6 +149,11 @@ async def chat_profile():
         cl.ChatProfile(
             name="Agent",
             markdown_description="The underlying LLM model is **GLM4**.",
+            icon="/public/google.png",
+        ),
+        cl.ChatProfile(
+            name="InternVL2",
+            markdown_description="The underlying LLM model is **InternVL2-8B**.",
             icon="/public/google.png",
         ),
         cl.ChatProfile(
@@ -324,13 +330,29 @@ def Agent_Chat_Model():
 
 
 ######################################################################################
-def Image_Gen_Model():
-    """
-        image gen
-    """
-    pass
+# def Image_Gen_Model():
+#     """
+#         image gen
+#     """
+#     pass
 
-    
+
+######################################################################################
+# def Multi_Chat_Model():
+#     """
+#         multi-modal model, image-text
+#     """
+#     model = AsyncOpenAI(
+#         base_url="http://0.0.0.0:8081/v1",
+#         api_key="token-internvl2",
+#     )
+#     settings = {
+#         "model": "internvl2", 
+#         "max_tokens": 512,
+#         "temperature": 0.1,  # 降低温度以减少重复
+#         "top_p": 0.9,        # 调整 top_p 以控制输出多样性
+#     }
+#     return model, settings
 
 
 
@@ -382,7 +404,12 @@ async def on_chat_start():
 
     elif (model_name == "ImageGen"):
         client = ZhipuAI(api_key=config["API_KEY"])
-        cl.user_session.set("client", client)   
+        cl.user_session.set("client", client)
+
+    # elif (model_name == "InternVL2"):
+    #     client, settings = Multi_Chat_Model()
+    #     cl.user_session.set("client", client)
+    #     cl.user_session.set("settings", settings)
 
 
 """
@@ -557,6 +584,7 @@ async def GraphRAG_Local_Model_Message(message):
     await msg.update()
 
 
+######################################################################################
 async def Image_Gen_Message(message):
     """
         image gen model chat message
@@ -577,6 +605,57 @@ async def Image_Gen_Message(message):
         elements=[image],
     ).send()
 
+
+
+######################################################################################
+async def Multi_Chat_Message(msg: cl.Message):
+    """
+        multi chat model chat message
+    """
+    if not msg.elements:
+        await cl.Message(content="🤗 请提供图片进行提问!").send()
+        return
+
+    # Processing images exclusively
+    images = [file for file in msg.elements if "image" in file.mime]
+
+    # Read the first image and convert to base64
+    with open(images[0].path, "rb") as f:
+        image_data = f.read()
+    encoded_string = base64.b64encode(image_data).decode("utf-8")
+    image_url = f"data:image/png;base64,{encoded_string}"
+
+    # Use OpenAI API
+    client = AsyncOpenAI(api_key='token-internvl2', base_url='http://localhost:8081/v1')
+    model_name = "internvl2"
+    response = await client.chat.completions.create(
+        model=model_name,
+        messages=[{
+            'role': 'user',
+            'content': [{
+                'type': 'text',
+                # 'text': 'describe this image',
+                'text': msg.content,
+            }, {
+                'type': 'image_url',
+                'image_url': {
+                    'url': image_url
+                },
+            }],
+        }],
+        temperature=0.1,
+        top_p=0.9,
+        stream=True,
+    )
+
+    msg = cl.Message(content="")
+    await msg.send()
+    
+    async for part in response:
+        if token := part.choices[0].delta.content or "":
+            await msg.stream_token(token)
+
+    await msg.update()
 
 
 """
@@ -615,5 +694,8 @@ async def on_message(message: cl.Message):
     
     elif (model_name == "ImageGen"):
         await Image_Gen_Message(message)
+    
+    elif (model_name == "InternVL2"):
+        await Multi_Chat_Message(message)
 
         
