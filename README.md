@@ -1,11 +1,44 @@
 # LLM
 
-基于主流大模型做一些应用
+基于主流大模型做一些应用, 集成了 RAG, GraphRAG, Agent, 文生图, 多模态对话等
 
 ---
 
 
-## [langchain_QA](https://github.com/yyhchen/LLM-Application/tree/main/langchain_QA)
+## 📦 environments
+
+```bash
+cd Chainlit && pip install -r requirements.txt
+```
+
+<br>
+
+在 Chainlit 目录下，执行:
+
+```bash
+chainlit run multi_chat.py
+```
+效果如下图所示：
+
+![使用界面](/assets/multi_chat1.png)
+
+目前已有的功能是 RAG, GraphRAG, Agent, 文生图, 多模态对话等
+
+![功能](/assets/multi_chat1.gif)
+
+在图文对话过程，考虑到不是纯语言模型的能力，实现了**非图对话**的判断：
+![发图问答](/assets/multi_chat2.gif)
+
+
+<br>
+<br>
+<br>
+
+
+
+## 🛠 各种技术的示范案例
+
+### [langchain_QA](https://github.com/yyhchen/LLM-Application/tree/main/langchain_QA)
 
 基于chatglm2-6b + langchain + chroma 做技术知识库问答(RAG)      
 - [本地知识库来源](https://github.com/yyhchen/Notes/tree/main/NLP%20review)
@@ -19,7 +52,7 @@
 <br>
 
 
-## [GraphRAG](https://github.com/yyhchen/LLM-Application/tree/main/GraphRAG)
+### [GraphRAG](https://github.com/yyhchen/LLM-Application/tree/main/GraphRAG)
 
 基于[官方GraphRAG](https://microsoft.github.io/graphrag/posts/get_started/)做的简单演示，并使用 `neo4j` 可视化知识图谱；演示的数据使用的是[text.txt](https://github.com/yyhchen/LLM-Application/blob/main/GraphRAG/text.txt) 
 
@@ -28,6 +61,6 @@
 <br>
 
 
-## [AutoGen](https://github.com/yyhchen/LLM-Application/tree/main/AutoGen)
+### [AutoGen](https://github.com/yyhchen/LLM-Application/tree/main/AutoGen)
 
 基于[官方AutoGen](https://microsoft.github.io/autogen/docs/Getting-Started)编写的一个案例实现 [Customize Speak Seletion](https://microsoft.github.io/autogen/docs/topics/groupchat/customized_speaker_selection) （实际上就是一个多轮的 multi-agent, 根据不同任务进行 agent选择）
