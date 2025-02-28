@@ -11,6 +11,14 @@
 <br>
 <br>
 
+## AutoGen更新了0.4.7稳定版本
+
+🔥 [新 tutorial base version: 0.4.7](https://github.com/yyhchen/LLM-Application/blob/main/AutoGen/tutorial/tutorial_autogen_0_4_7_version.ipynb)
+
+
+
+<br>
+<br>
 
 ## 📖 Introduction
 
