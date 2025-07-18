@@ -36,7 +36,7 @@ python >=3.8 & <3.13
 
 安装 `AutoGen`
 ```sh
-pip install pyautogen
+pip install ag2
 ```
 
 
@@ -85,7 +85,7 @@ AutoGen 支持 RAG，通过在 LLM 的输入中添加来自外部数据源的文
 ### envs
 ```bash
 # 加 -q 控制台没有安装信息
-pip install pyautogen[retrievechat] langchain "chromadb<0.4.15" -q
+pip install ag2[retrievechat] langchain "chromadb<0.4.15" -q
 ```
 
 <br>

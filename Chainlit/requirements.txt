@@ -255,7 +255,7 @@ pyairports==2.1.1
 pyaml-env==1.2.1
 pyarrow==15.0.2
 pyarrow-hotfix==0.6
-pyautogen==0.2.33
+ag2==0.2.33
 pycodestyle==2.12.1
 pycountry==24.6.1
 pycparser==2.22
