@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI每日新闻简报</title>
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --secondary-color: #3f37c9;
+            --accent-color: #4895ef;
+            --light-color: #f8f9fa;
+            --dark-color: #212529;
+            --success-color: #4cc9f0;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .date {
+            color: var(--secondary-color);
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .news-card {
+            background: white;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--box-shadow);
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card-title {
+            color: var(--dark-color);
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .card-body {
+            padding: 20px;
+        }
+
+        .card-content {
+            color: #495057;
+            line-height: 1.7;
+        }
+
+        .card-footer {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .news-id {
+            background: var(--primary-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .category {
+            background: var(--success-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .no-news {
+            text-align: center;
+            padding: 50px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            grid-column: 1 / -1;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            grid-column: 1 / -1;
+        }
+
+        .refresh-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: var(--transition);
+            margin-top: 20px;
+        }
+
+        .refresh-btn:hover {
+            background: var(--secondary-color);
+            transform: scale(1.05);
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 0;
+            margin-top: 40px;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close {
+            color: #aaa;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: var(--dark-color);
+        }
+
+        .modal-content h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            padding-right: 40px;
+        }
+
+        .modal-content p {
+            line-height: 1.8;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 768px) {
+            .news-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI每日新闻简报</h1>
+            <div class="date" id="current-date">加载中...</div>
+        </header>
+
+        <div style="text-align: center;">
+            <button class="refresh-btn" onclick="loadNews()">刷新新闻</button>
+        </div>
+
+        <div class="news-grid" id="news-container">
+            <div class="loading">正在加载新闻...</div>
+        </div>
+
+        <!-- 模态框用于显示完整内容 -->
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="modal-title"></h2>
+                <div id="modal-body"></div>
+            </div>
+        </div>
+
+        <footer>
+            <p>AI每日新闻简报 &copy; 2025 | 使用AI技术自动收集整理</p>
+        </footer>
+    </div>
+
+    <script>
+        // 获取当前日期并格式化（匹配Python脚本生成的文件名格式）
+        function getCurrentDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}_${month}_${day}`;
+        }
+
+        // 格式化显示日期
+        function formatDisplayDate() {
+            const now = new Date();
+            const options = { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                weekday: 'long'
+            };
+            return now.toLocaleDateString('zh-CN', options);
+        }
+
+        // 显示模态框
+        function showModal(title, content) {
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            
+            modalTitle.textContent = title;
+            modalBody.innerHTML = `<p>${content}</p>`;
+            
+            modal.style.display = 'block';
+        }
+
+        // 关闭模态框
+        function setupModal() {
+            const modal = document.getElementById('modal');
+            const span = document.getElementsByClassName('close')[0];
+            
+            // 点击关闭按钮关闭模态框
+            span.onclick = function() {
+                modal.style.display = 'none';
+            }
+            
+            // 点击模态框外部关闭
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+        }
+
+        // 加载新闻数据
+        async function loadNews() {
+            const date = getCurrentDate();
+            const newsContainer = document.getElementById('news-container');
+            const currentDateElement = document.getElementById('current-date');
+            
+            // 更新日期显示
+            currentDateElement.textContent = formatDisplayDate();
+            
+            try {
+                // 尝试加载JSON数据
+                const jsonDataResponse = await fetch(`${date}.json`);
+                if (!jsonDataResponse.ok) throw new Error('JSON数据文件未找到');
+                
+                const newsData = await jsonDataResponse.json();
+                
+                // 尝试加载摘要文本
+                let summaryData = null;
+                try {
+                    const txtDataResponse = await fetch(`${date}_news_data.txt`);
+                    if (txtDataResponse.ok) {
+                        const summaryText = await txtDataResponse.text();
+                        // 将摘要文本按行分割
+                        summaryData = summaryText.split('\n').filter(line => line.trim() !== '');
+                    }
+                } catch (txtError) {
+                    console.warn("摘要加载失败:", txtError);
+                }
+                
+                // 渲染新闻卡片（使用摘要内容）
+                if (newsData && newsData.length > 0) {
+                    newsContainer.innerHTML = newsData.map((news, index) => {
+                        // 获取对应的摘要内容
+                        const summary = summaryData && summaryData[index] ? summaryData[index] : '暂无摘要';
+                        
+                        // 转义单引号以避免JavaScript错误
+                        const escapedTitle = (news.title || '无标题').replace(/'/g, "\\'");
+                        const escapedSummary = summary.replace(/'/g, "\\'");
+                        
+                        return `
+                        <div class="news-card" onclick="showModal('${escapedTitle}', '${escapedSummary}')">
+                            <div class="card-header">
+                                <h3 class="card-title">${news.title || '无标题'}</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="card-content">
+                                    ${summary}
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <span class="news-id">ID: ${news.news_id || 'N/A'}</span>
+                                <span class="category">${news.category || '未分类'}</span>
+                            </div>
+                        </div>
+                    `}).join('');
+                } else {
+                    newsContainer.innerHTML = '<div class="no-news">今日暂无新闻</div>';
+                }
+            } catch (error) {
+                console.error('加载新闻失败:', error);
+                newsContainer.innerHTML = `
+                    <div class="no-news">
+                        <h3>加载失败</h3>
+                        <p>请确保已运行新闻爬取程序生成数据文件</p>
+                        <p>错误信息: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 页面加载完成后自动加载新闻
+        document.addEventListener('DOMContentLoaded', function() {
+            setupModal();
+            loadNews();
+        });
+    </script>
+</body>
+</html>
