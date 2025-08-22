@@ -74,8 +74,8 @@ chainlit run multi_chat.py
 
 通过爬取[aibase](https://news.aibase.com/zh/news) 制作ai早报
 
-- [ai_information_daily.ipynb]() 和 [ai_daily_news.py]() 包括了爬取的代码和生成摘要的代码，两者是一样的
-- [reading.html]()  是方便读取新闻的网页，做了卡片视觉效果，效果截图如下：
+- [ai_information_daily.ipynb](https://github.com/yyhchen/LLM-Application/blob/main/app%20case/ai_daily_briefing/ai_information_daily.ipynb) 和 [ai_daily_news.py](https://github.com/yyhchen/LLM-Application/blob/main/app%20case/ai_daily_briefing/ai_daily_news.py) 包括了爬取的代码和生成摘要的代码，两者是一样的
+- [reading.html](https://github.com/yyhchen/LLM-Application/blob/main/app%20case/ai_daily_briefing/reading.html)  是方便读取新闻的网页，做了卡片视觉效果，效果截图如下：
 
 ![功能](/assets/ai_info_show.gif.gif)
 
