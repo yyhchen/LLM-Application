@@ -30,3 +30,4 @@ debug.ipynb
 **/__pycache__
 **/*.json
 **/*.txt
+**/.DS_Store
