@@ -156,9 +156,9 @@ async def main():
     # 检查API密钥是否存在
     if not api_key:
         print("警告: 未找到ZHIPU_API_KEY环境变量，将跳过摘要生成")
-        summary = "无法生成摘要：未配置API密钥 或密钥错误 (建议debug下密钥，有可能只是之前设置为系统变量了)"
+        summaries = ["无法生成摘要：未配置API密钥 或密钥错误 (建议debug下密钥，有可能只是之前设置为系统变量了)"]
     else:
-        def get_news_summary(data):
+        def get_news_summary(article_data):
             client = OpenAI(
                 api_key=api_key,
                 base_url="https://open.bigmodel.cn/api/paas/v4/"
@@ -166,20 +166,20 @@ async def main():
 
             system_prompt = """
             ## Goals
-            读取并解析JSON格式的文章，提炼出文章的主旨，形成一句简洁的概述。
+            读取并解析单条新闻文章，提炼出文章的主旨，形成一句简洁的概述。
 
             ## Constrains:
             概述长度150字左右，保持文章的原意和重点。
 
             ## Skills
-            JSON解析能力，文章内容理解和总结能力。
+            文章内容理解和总结能力。
 
             ## Output Format
             一句话概述，简洁明了，不超过150字。
 
             ## Workflow:
-            1. 读取并解析JSON格式的文章
-            2. 理解文章内容，提取关键信息
+            1. 理解文章标题和内容
+            2. 提取关键信息和主要观点
             3. 生成一句简洁的概述，不超过150字
             """
 
@@ -188,7 +188,7 @@ async def main():
                     model="glm-4.5-flash",
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"文章内容：{data}"}
+                        {"role": "user", "content": f"内容：{article_data['content']}"}
                     ],
                     top_p=0.7,
                     temperature=0.1,
@@ -196,17 +196,22 @@ async def main():
                 )
                 return response.choices[0].message.content
             except Exception as e:
-                print(f"error: {e}")
-                return "无法生成摘要：API调用失败"
+                print(f"摘要生成错误: {e}")
+                return f"无法生成摘要：{article_data['title']}"
         
-        summary = get_news_summary(all_news_data)
-        print(summary)
+        # 为每条新闻生成摘要
+        summaries = []
+        for i, article in enumerate(all_news_data):
+            print(f"正在生成第 {i+1}/{len(all_news_data)} 条新闻摘要...")
+            summary = get_news_summary(article)
+            summaries.append(summary)
     
     # 将摘要好的数据写入到一个 .txt文件中
     txt_file_name = os.path.join(current_dir, f"{current_time}_news_data.txt")
     with open(txt_file_name, 'w', encoding='utf-8') as f:
-        # 确保写入的是字符串
-        f.write(str(summary) if summary is not None else "摘要生成失败")
+        # 写入所有摘要，每条摘要占一行
+        for summary in summaries:
+            f.write(summary + "\n\n")
 
 # 运行
 if __name__ == "__main__":
