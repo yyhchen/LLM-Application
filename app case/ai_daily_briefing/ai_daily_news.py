@@ -5,7 +5,7 @@ import json
 import asyncio
 import os
 from crawl4ai import AsyncWebCrawler
-from datetime import datetime
+from datetime import datetime, timedelta
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -94,6 +94,29 @@ async def extract_ai_news_article(article_id):
         
         return data
 
+# 获取昨天最后一条新闻的编号
+def get_yesterday_last_number():
+    """从昨天的JSON文件中获取最后一条新闻的news_id"""
+    yesterday = datetime.now() - timedelta(days=1)
+    yesterday_file = f"{yesterday.strftime('%Y_%m_%d')}.json"
+    
+    # 获取当前脚本所在目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    yesterday_file_path = os.path.join(current_dir, yesterday_file)
+    
+    try:
+        if os.path.exists(yesterday_file_path):
+            with open(yesterday_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if data and len(data) > 0:
+                    # 获取最后一条新闻的news_id，然后+1作为今天的起始编号
+                    return data[-1]['news_id'] + 1
+        print(f"未找到昨天的文件 {yesterday_file}，使用默认起始编号 20737")
+        return 20737
+    except Exception as e:
+        print(f"读取昨天文件时出错: {e}，使用默认起始编号 20737")
+        return 20737
+
 # 3. 开始提取ai咨询内容
 async def main():
     print("开始提取文章数据...")
@@ -103,10 +126,13 @@ async def main():
     
     # 获取当前时间并格式化为文件名
     current_time = datetime.now().strftime("%Y_%m_%d")
-    file_name = f"{current_time}.json"
     
-    # （`yesterday_last_number` 也是需要每天更改的 ）
-    yesterday_last_number = 20659
+    # 获取当前脚本所在目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_name = os.path.join(current_dir, f"{current_time}.json")
+    
+    # 从昨天的文件中获取起始编号
+    yesterday_last_number = get_yesterday_last_number()
     all_news_data = []  # 添加这行来存储所有数据
     
     for i in range(yesterday_last_number, number + 1):
@@ -177,7 +203,7 @@ async def main():
         print(summary)
     
     # 将摘要好的数据写入到一个 .txt文件中
-    txt_file_name = f"{current_time}_news_data.txt"
+    txt_file_name = os.path.join(current_dir, f"{current_time}_news_data.txt")
     with open(txt_file_name, 'w', encoding='utf-8') as f:
         # 确保写入的是字符串
         f.write(str(summary) if summary is not None else "摘要生成失败")
