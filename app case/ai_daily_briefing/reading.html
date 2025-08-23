@@ -160,6 +160,77 @@
             transform: scale(1.05);
         }
 
+        /* 日期选择器样式 */
+        .date-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .date-input {
+            padding: 10px 15px;
+            border: 2px solid var(--primary-color);
+            border-radius: 25px;
+            font-size: 1rem;
+            background: white;
+            color: var(--dark-color);
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .date-input:focus {
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+            border-color: var(--secondary-color);
+        }
+
+        .nav-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: var(--transition);
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-btn:hover {
+            background: var(--secondary-color);
+            transform: scale(1.1);
+        }
+
+        .nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .today-btn {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .today-btn:hover {
+            background: #3bb5e0;
+            transform: scale(1.05);
+        }
+
         footer {
             text-align: center;
             padding: 30px 0;
@@ -237,6 +308,15 @@
                 width: 95%;
                 padding: 20px;
             }
+            
+            .date-controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .date-input {
+                width: 200px;
+            }
         }
     </style>
 </head>
@@ -247,8 +327,13 @@
             <div class="date" id="current-date">加载中...</div>
         </header>
 
-        <div style="text-align: center;">
-            <button class="refresh-btn" onclick="loadNews()">刷新新闻</button>
+        <!-- 日期控制区域 -->
+        <div class="date-controls">
+            <button class="nav-btn" id="prev-day" onclick="navigateDate(-1)" title="前一天">‹</button>
+            <input type="date" class="date-input" id="date-picker" onchange="loadNewsForDate()">
+            <button class="nav-btn" id="next-day" onclick="navigateDate(1)" title="后一天">›</button>
+            <button class="today-btn" onclick="goToToday()">今天</button>
+            <button class="refresh-btn" onclick="loadNews()">刷新</button>
         </div>
 
         <div class="news-grid" id="news-container">
@@ -323,12 +408,24 @@
 
         // 加载新闻数据
         async function loadNews() {
-            const date = getCurrentDate();
+            const datePicker = document.getElementById('date-picker');
+            const selectedDate = datePicker.value;
+            const date = selectedDate ? selectedDate.replace(/-/g, '_') : getCurrentDate();
+            
+            await loadNewsForSpecificDate(date);
+        }
+
+        // 为特定日期加载新闻
+        async function loadNewsForSpecificDate(date) {
             const newsContainer = document.getElementById('news-container');
             const currentDateElement = document.getElementById('current-date');
             
             // 更新日期显示
-            currentDateElement.textContent = formatDisplayDate();
+            const displayDate = formatDateForDisplay(date);
+            currentDateElement.textContent = displayDate;
+            
+            // 显示加载状态
+            newsContainer.innerHTML = '<div class="loading">正在加载新闻...</div>';
             
             try {
                 // 尝试加载JSON数据
@@ -391,9 +488,90 @@
             }
         }
 
+        // 格式化日期用于显示
+        function formatDateForDisplay(dateStr) {
+            const parts = dateStr.split('_');
+            if (parts.length === 3) {
+                const date = new Date(parts[0], parts[1] - 1, parts[2]);
+                const options = { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    weekday: 'long'
+                };
+                return date.toLocaleDateString('zh-CN', options);
+            }
+            return formatDisplayDate();
+        }
+
+        // 日期导航功能
+        function navigateDate(days) {
+            const datePicker = document.getElementById('date-picker');
+            const currentDate = datePicker.value ? new Date(datePicker.value) : new Date();
+            
+            currentDate.setDate(currentDate.getDate() + days);
+            
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const day = String(currentDate.getDate()).padStart(2, '0');
+            
+            datePicker.value = `${year}-${month}-${day}`;
+            loadNewsForDate();
+        }
+
+        // 回到今天
+        function goToToday() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            
+            document.getElementById('date-picker').value = `${year}-${month}-${day}`;
+            loadNewsForDate();
+        }
+
+        // 当日期选择器改变时加载新闻
+        function loadNewsForDate() {
+            const datePicker = document.getElementById('date-picker');
+            const selectedDate = datePicker.value;
+            
+            if (selectedDate) {
+                const formattedDate = selectedDate.replace(/-/g, '_');
+                loadNewsForSpecificDate(formattedDate);
+                updateNavigationButtons();
+            }
+        }
+
+        // 更新导航按钮状态
+        function updateNavigationButtons() {
+            const datePicker = document.getElementById('date-picker');
+            const nextBtn = document.getElementById('next-day');
+            const today = new Date();
+            const selectedDate = new Date(datePicker.value);
+            
+            // 如果选择的日期是今天或之后，禁用"后一天"按钮
+            if (selectedDate >= today) {
+                nextBtn.disabled = true;
+            } else {
+                nextBtn.disabled = false;
+            }
+        }
+
+        // 初始化日期选择器
+        function initializeDatePicker() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            
+            document.getElementById('date-picker').value = `${year}-${month}-${day}`;
+            updateNavigationButtons();
+        }
+
         // 页面加载完成后自动加载新闻
         document.addEventListener('DOMContentLoaded', function() {
             setupModal();
+            initializeDatePicker();
             loadNews();
         });
     </script>
