@@ -95,7 +95,7 @@ async def extract_ai_news_article(article_id):
         return data
 
 # 获取昨天最后一条新闻的编号
-def get_yesterday_last_number():
+def get_yesterday_last_number(latest_number):
     """从昨天的JSON文件中获取最后一条新闻的news_id"""
     yesterday = datetime.now() - timedelta(days=1)
     yesterday_file = f"{yesterday.strftime('%Y_%m_%d')}.json"
@@ -111,11 +111,12 @@ def get_yesterday_last_number():
                 if data and len(data) > 0:
                     # 获取最后一条新闻的news_id，然后+1作为今天的起始编号
                     return data[-1]['news_id'] + 1
-        print(f"未找到昨天的文件 {yesterday_file}，使用默认起始编号 20737")
-        return 20737
+        print(f"未找到昨天的文件 {yesterday_file}，将只获取最新一条新闻")
+        # 如果找不到昨天的文件，返回最新编号（只获取一条最新新闻）
+        return latest_number
     except Exception as e:
-        print(f"读取昨天文件时出错: {e}，使用默认起始编号 20737")
-        return 20737
+        print(f"读取昨天文件时出错: {e}，将只获取最新一条新闻")
+        return latest_number
 
 # 3. 开始提取ai咨询内容
 async def main():
@@ -132,7 +133,8 @@ async def main():
     file_name = os.path.join(current_dir, f"{current_time}.json")
     
     # 从昨天的文件中获取起始编号
-    yesterday_last_number = get_yesterday_last_number()
+    yesterday_last_number = get_yesterday_last_number(number)
+    
     all_news_data = []  # 添加这行来存储所有数据
     
     for i in range(yesterday_last_number, number + 1):
