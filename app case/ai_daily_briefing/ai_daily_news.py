@@ -111,12 +111,12 @@ def get_yesterday_last_number(latest_number):
                 if data and len(data) > 0:
                     # 获取最后一条新闻的news_id，然后+1作为今天的起始编号
                     return data[-1]['news_id'] + 1
-        print(f"未找到昨天的文件 {yesterday_file}，将只获取最新一条新闻")
-        # 如果找不到昨天的文件，返回最新编号（只获取一条最新新闻）
-        return latest_number
+        print(f"未找到昨天的文件 {yesterday_file}，将获取最新30条新闻")
+        # 如果找不到昨天的文件，返回最新编号减去30（获取最近30条新闻）
+        return max(1, latest_number - 30)  # 确保不会返回负数或0
     except Exception as e:
-        print(f"读取昨天文件时出错: {e}，将只获取最新一条新闻")
-        return latest_number
+        print(f"读取昨天文件时出错: {e}，将获取最新30条新闻")
+        return max(1, latest_number - 30)  # 确保不会返回负数或0
 
 # 3. 开始提取ai咨询内容
 async def main():
