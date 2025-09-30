@@ -153,7 +153,8 @@ async def main():
     
     # 4. 将提取好的json数据做摘要
     load_dotenv()
-    api_key = os.getenv("ZHIPU_API_KEY")
+    # api_key = os.getenv("ZHIPU_API_KEY")
+    api_key = os.getenv("MEITUAN_API_KEY")
     
     # 检查API密钥是否存在
     if not api_key:
@@ -163,7 +164,8 @@ async def main():
         def get_news_summary(article_data):
             client = OpenAI(
                 api_key=api_key,
-                base_url="https://open.bigmodel.cn/api/paas/v4/"
+                # base_url="https://open.bigmodel.cn/api/paas/v4/"
+                base_url="https://api.longcat.chat/openai"
             )
 
             system_prompt = """
@@ -187,7 +189,8 @@ async def main():
 
             try:
                 response = client.chat.completions.create(
-                    model="glm-4.5-flash",
+                    # model="glm-4.5-flash",
+                    model="LongCat-Flash-Chat",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": f"内容：{article_data['content']}"}
