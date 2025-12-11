@@ -8,6 +8,8 @@ import re
 import logging
 import os
 import json
+import time
+import random
 from typing import List, Dict, Optional
 from datetime import datetime
 import requests
@@ -38,16 +40,33 @@ class FinancialNewsCrawler:
     def __init__(self):
         """初始化爬虫"""
         self.session = requests.Session()
-        # 设置合理的请求头，模拟浏览器
+        
+        # 动态User-Agent池，模拟不同浏览器
+        self.user_agents = [
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/114.0.1823.51",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        ]
+        
+        # 设置初始请求头，后续会动态更新User-Agent
         self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
         })
-        # 设置超时时间
-        self.timeout = 10
+        
+        # 配置项
+        self.timeout = 15  # 增加超时时间，提高稳定性
+        self.max_retries = 3  # 最大重试次数
+        
+        # 延时配置，用于反爬
+        self.min_sleep_time = 1  # 最小延时时间（秒）
+        self.max_sleep_time = 3  # 最大延时时间（秒）
+        self.min_retry_sleep_time = 3  # 重试时最小延时时间（秒）
+        self.max_retry_sleep_time = 5  # 重试时最大延时时间（秒）
         
         # 数据目录结构配置
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -65,7 +84,12 @@ class FinancialNewsCrawler:
         os.makedirs(self.json_dir, exist_ok=True)
         os.makedirs(self.txt_dir, exist_ok=True)
     
-    def crawl(self, max_news: int = 5) -> List[Dict]:
+    def _update_user_agent(self) -> None:
+        """动态更新User-Agent，提高反爬能力"""
+        user_agent = random.choice(self.user_agents)
+        self.session.headers.update({"User-Agent": user_agent})
+    
+    def crawl(self, max_news: int = 30) -> List[Dict]:
         """
         爬取财经新闻
         
@@ -80,20 +104,58 @@ class FinancialNewsCrawler:
         news_list = []
         
         try:
+            # 更新User-Agent
+            self._update_user_agent()
+            
             # 获取新闻列表
             news_links = self._get_news_links()
             logger.info(f"获取到{len(news_links)}条新闻链接")
             
+            # 检查新闻链接数量
+            if len(news_links) < max_news:
+                logger.warning(f"只获取到{len(news_links)}条新闻链接，少于请求的{max_news}条")
+                max_news = len(news_links)  # 调整实际爬取数量
+            
             # 限制爬取数量
-            for link in news_links[:max_news]:
+            for i, link in enumerate(news_links[:max_news], 1):
                 try:
-                    # 获取新闻详情
-                    news_item = self._get_news_detail(link)
+                    logger.info(f"正在爬取第{i}/{max_news}条新闻...")
+                    
+                    # 智能延时，模拟人类阅读间隔
+                    sleep_time = random.uniform(self.min_sleep_time, self.max_sleep_time)
+                    logger.info(f"等待 {sleep_time:.2f} 秒后开始爬取...")
+                    time.sleep(sleep_time)
+                    
+                    # 动态更新User-Agent，进一步提高反爬能力
+                    self._update_user_agent()
+                    
+                    # 获取新闻详情，支持重试
+                    news_item = None
+                    for retry in range(self.max_retries):
+                        try:
+                            news_item = self._get_news_detail(link)
+                            if news_item:
+                                break
+                            else:
+                                logger.warning(f"第{retry+1}/{self.max_retries}次尝试获取新闻详情失败，内容为空")
+                        except Exception as e:
+                            logger.warning(f"第{retry+1}/{self.max_retries}次尝试获取新闻详情失败：{e}")
+                        
+                        # 重试时增加延时
+                        if retry < self.max_retries - 1:
+                            retry_sleep_time = random.uniform(self.min_retry_sleep_time, self.max_retry_sleep_time)
+                            logger.info(f"重试等待 {retry_sleep_time:.2f} 秒后继续...")
+                            time.sleep(retry_sleep_time)
+                    
                     if news_item:
                         news_list.append(news_item)
                         logger.info(f"成功爬取新闻：{news_item['title']}")
+                    else:
+                        logger.warning(f"多次尝试后仍无法获取新闻详情：{link}")
                 except Exception as e:
-                    logger.warning(f"爬取新闻详情失败：{e}")
+                    logger.error(f"爬取新闻详情时发生未知错误：{e}")
+                    # 发生未知错误时，增加延时后继续
+                    time.sleep(random.uniform(self.min_retry_sleep_time, self.max_retry_sleep_time))
                     continue
         except Exception as e:
             logger.error(f"爬取{self.SOURCE_NAME}失败：{e}")
