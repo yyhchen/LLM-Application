@@ -31,3 +31,4 @@ debug.ipynb
 **/*.json
 **/*.txt
 **/.DS_Store
+.trae/
