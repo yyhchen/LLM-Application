@@ -737,6 +737,15 @@
                 modalBody.innerHTML = formatContent(newsItem.content || '', 'finance');
             } else {
                 // AI新闻模态框
+                if (newsItem.summary) {
+                    const summaryHtml = `
+                        <div class="modal-summary">
+                            <h3>摘要</h3>
+                            <p>${newsItem.summary}</p>
+                        </div>
+                    `;
+                    modalSummaryContainer.innerHTML = summaryHtml;
+                }
                 modalBody.innerHTML = formatContent(newsItem.content || '', 'ai');
             }
             
