@@ -428,8 +428,20 @@
             newsContainer.innerHTML = '<div class="loading">正在加载新闻...</div>';
             
             try {
+                // 解析日期，获取年份和月份
+                const dateParts = date.split('_');
+                if (dateParts.length !== 3) {
+                    throw new Error('日期格式错误');
+                }
+                const year = dateParts[0];
+                const month = dateParts[1];
+                
+                // 构建新的文件路径：data/json/YYYY/MM/date.json 和 data/txt/YYYY/MM/date_news_data.txt
+                const jsonPath = `data/json/${year}/${month}/${date}.json`;
+                const txtPath = `data/txt/${year}/${month}/${date}_news_data.txt`;
+                
                 // 尝试加载JSON数据
-                const jsonDataResponse = await fetch(`${date}.json`);
+                const jsonDataResponse = await fetch(jsonPath);
                 if (!jsonDataResponse.ok) throw new Error('JSON数据文件未找到');
                 
                 const newsData = await jsonDataResponse.json();
@@ -437,7 +449,7 @@
                 // 尝试加载摘要文本
                 let summaryData = null;
                 try {
-                    const txtDataResponse = await fetch(`${date}_news_data.txt`);
+                    const txtDataResponse = await fetch(txtPath);
                     if (txtDataResponse.ok) {
                         const summaryText = await txtDataResponse.text();
                         // 将摘要文本按行分割
@@ -451,7 +463,8 @@
                 if (newsData && newsData.length > 0) {
                     newsContainer.innerHTML = newsData.map((news, index) => {
                         // 获取对应的摘要内容
-                        const summary = summaryData && summaryData[index] ? summaryData[index] : '暂无摘要';
+                        // 从v0.7.0开始，摘要直接存储在JSON中
+                        const summary = news.summary || (summaryData && summaryData[index] ? summaryData[index] : '暂无摘要');
                         
                         // 转义单引号以避免JavaScript错误
                         const escapedTitle = (news.title || '无标题').replace(/'/g, "\\'");

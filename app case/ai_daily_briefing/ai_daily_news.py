@@ -4,13 +4,63 @@ import re
 import json
 import asyncio
 import os
+import logging
+from typing import List, Dict, Optional, Any
 from crawl4ai import AsyncWebCrawler
 from datetime import datetime, timedelta
 from openai import OpenAI
 from dotenv import load_dotenv
 
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+# 配置常量
+BASE_URL = "https://www.aibase.com/zh/news"
+API_BASE_URL = "https://api.longcat.chat/openai"
+MODEL_NAME = "LongCat-Flash-Chat"
+JS_WAIT_TIME = 5000  # 毫秒
+CRAWLER_TIMEOUT = 30000  # 毫秒
+DEFAULT_NEWS_COUNT = 30
+API_KEY_ENV_VAR = "MEITUAN_API_KEY"
+
+# 系统常量
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 数据目录结构
+DATA_DIR = os.path.join(SCRIPT_DIR, "data")
+
+# 获取当前年份和月份
+current_year = datetime.now().strftime("%Y")
+current_month = datetime.now().strftime("%m")
+
+# 按年份/月份划分的目录
+JSON_DIR = os.path.join(DATA_DIR, "json", current_year, current_month)
+TXT_DIR = os.path.join(DATA_DIR, "txt", current_year, current_month)
+
+# 确保目录存在
+os.makedirs(JSON_DIR, exist_ok=True)
+os.makedirs(TXT_DIR, exist_ok=True)
+
+# 预编译正则表达式
+NEWS_ID_PATTERN = re.compile(r'/news/(\d+)')
+TITLE_PATTERN = re.compile(r'<h1[^>]*>(.*?)</h1>', re.DOTALL | re.IGNORECASE)
+CONTENT_PATTERN = re.compile(r'<div[^>]*class="[^"]*post-content[^"]*"[^>]*>(.*?)</div>', re.DOTALL | re.IGNORECASE)
+HTML_TAG_PATTERN = re.compile(r'<[^>]+>')
+WHITESPACE_PATTERN = re.compile(r'\s+')
+DATE_PATTERNS = [
+    re.compile(r'(\d+)\s*分钟阅读'),
+    re.compile(r'(Oct\s+\d+,\s+\d+)'),
+    re.compile(r'(\d{4}-\d{2}-\d{2})'),
+]
+
 # 1. 获取文章链接
-def extract_snumber_from_url(base_url):
+def extract_snumber_from_url(base_url: str) -> Optional[int]:
     try:
         response = requests.get(base_url)
         response.encoding = 'utf-8'
@@ -21,88 +71,111 @@ def extract_snumber_from_url(base_url):
         for link in links:
             href = link.get('href')
             if href:
-                pattern = r'/news/(\d+)' 
-                match = re.search(pattern, href)
+                match = NEWS_ID_PATTERN.search(href)
                 if match:
                     snumber = int(match.group(1))
                     return snumber
         return None
+    except requests.exceptions.RequestException as e:
+        logging.error(f"网络请求错误: {e}")
     except Exception as e:
-        print(f"error: {e}")
+        logging.error(f"提取文章链接错误: {e}")
     return None
 
 # 2. 获取文章内容
-async def extract_ai_news_article(article_id):
+async def extract_ai_news_article(article_id: int) -> Optional[Dict[str, Any]]:
     """使用正则表达式提取AIbase新闻文章数据"""
     
-    async with AsyncWebCrawler(verbose=False) as crawler:
-        result = await crawler.arun(
-            url=f"https://www.aibase.com/zh/news/{article_id}",
-            bypass_cache=True,
-            js_code=["await new Promise(resolve => setTimeout(resolve, 5000));"],
-            timeout=30000,
-        )
+    try:
+        async with AsyncWebCrawler(verbose=False) as crawler:
+            result = await crawler.arun(
+                url=f"{BASE_URL}/{article_id}",
+                bypass_cache=True,
+                js_code=[f"await new Promise(resolve => setTimeout(resolve, {JS_WAIT_TIME}));"],
+                timeout=CRAWLER_TIMEOUT,
+            )
 
-        if not result.success:
-            print(f"页面爬取失败: {result.error}")
-            return None
+            if not result.success:
+                logging.error(f"页面爬取失败: {result.error}")
+                return None
 
-        html = result.html
-        
-        # 提取标题
-        title_match = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL | re.IGNORECASE)
-        title = title_match.group(1).strip() if title_match else ""
-        
-        # 提取内容 - 查找post-content类
-        content_pattern = r'<div[^>]*class="[^"]*post-content[^"]*"[^>]*>(.*?)</div>'
-        content_match = re.search(content_pattern, html, re.DOTALL | re.IGNORECASE)
-        
-        if content_match:
-            content_html = content_match.group(1)
-            # 移除HTML标签
-            content = re.sub(r'<[^>]+>', '', content_html)
-            content = re.sub(r'\s+', ' ', content).strip()
-        else:
+            # 使用BeautifulSoup解析HTML
+            soup = BeautifulSoup(result.html, 'html.parser')
+            
+            # 提取标题
+            title_tag = soup.find('h1')
+            title = title_tag.get_text().strip() if title_tag else ""
+            
+            # 提取内容 - 查找post-content类
+            content_div = soup.find('div', class_='post-content')
             content = ""
-        
-        # 查找日期信息
-        date_patterns = [
-            r'(\d+)\s*分钟阅读',
-            r'(Oct\s+\d+,\s+\d+)',
-            r'(\d{4}-\d{2}-\d{2})',
-        ]
-        
-        publish_date = ""
-        for pattern in date_patterns:
-            match = re.search(pattern, html)
-            if match:
-                publish_date = match.group(1)
-                break
-        
-        # 提取分类信息
-        category = ""
-        if "AI新闻资讯" in html:
-            category = "AI新闻资讯"
-        
-        data = {
-            "title": title,
-            "content": content,
-            "publish_date": publish_date,
-            "category": category,
-            "content_length": len(content)
-        }
-        
-        return data
+            if content_div:
+                # 获取所有文本，自动去除HTML标签
+                content = content_div.get_text(separator=' ', strip=True)
+            
+            # 查找日期信息
+            publish_date = ""
+            # 尝试查找包含日期的元素
+            # 可能的日期位置：meta标签、时间标签、或特定class的div
+            time_tag = soup.find('time')
+            if time_tag:
+                publish_date = time_tag.get_text().strip()
+            else:
+                # 查找包含日期的meta标签
+                meta_tag = soup.find('meta', property='article:published_time')
+                if meta_tag and meta_tag.get('content'):
+                    publish_date = meta_tag.get('content')
+                else:
+                    # 尝试从页面文本中提取日期（保留原有的正则方法作为备选）
+                    for pattern in DATE_PATTERNS:
+                        match = pattern.search(result.html)
+                        if match:
+                            publish_date = match.group(1)
+                            break
+            
+            # 提取分类信息
+            category = ""
+            # 尝试查找分类标签
+            category_tag = soup.find('a', href=lambda href: href and '/category/' in href)
+            if category_tag:
+                category = category_tag.get_text().strip()
+            else:
+                # 保留原有的分类判断作为备选
+                if "AI新闻资讯" in result.html:
+                    category = "AI新闻资讯"
+            
+            data: Dict[str, Any] = {
+                "title": title,
+                "content": content,
+                "publish_date": publish_date,
+                "category": category,
+                "content_length": len(content)
+            }
+            
+            return data
+    except Exception as e:
+        logging.error(f"爬取文章 {article_id} 时出错: {e}")
+        return None
 
 # 获取昨天最后一条新闻的编号
-def get_yesterday_last_number(latest_number):
+def get_yesterday_last_number(latest_number: int) -> int:
     """从昨天的JSON文件中获取最后一条新闻的news_id"""
     yesterday = datetime.now() - timedelta(days=1)
     yesterday_file = f"{yesterday.strftime('%Y_%m_%d')}.json"
+    yesterday_year = yesterday.strftime("%Y")
+    yesterday_month = yesterday.strftime("%m")
     
-    # 获取当前脚本所在目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    yesterday_file_path = os.path.join(current_dir, yesterday_file)
+    # 1. 优先查找按年份/月份划分的目录（新位置）
+    yesterday_json_dir = os.path.join(DATA_DIR, "json", yesterday_year, yesterday_month)
+    yesterday_file_path = os.path.join(yesterday_json_dir, yesterday_file)
+    
+    # 2. 如果新位置不存在，尝试旧的data/json目录
+    if not os.path.exists(yesterday_file_path):
+        yesterday_file_path = os.path.join(DATA_DIR, "json", yesterday_file)
+    
+    # 3. 如果还不存在，尝试脚本所在目录（最旧位置）
+    if not os.path.exists(yesterday_file_path):
+        yesterday_file_path = os.path.join(SCRIPT_DIR, yesterday_file)
     
     try:
         if os.path.exists(yesterday_file_path):
@@ -111,108 +184,153 @@ def get_yesterday_last_number(latest_number):
                 if data and len(data) > 0:
                     # 获取最后一条新闻的news_id，然后+1作为今天的起始编号
                     return data[-1]['news_id'] + 1
-        print(f"未找到昨天的文件 {yesterday_file}，将获取最新30条新闻")
-        # 如果找不到昨天的文件，返回最新编号减去30（获取最近30条新闻）
-        return max(1, latest_number - 30)  # 确保不会返回负数或0
+        logging.info(f"未找到昨天的文件 {yesterday_file}，将获取最新{DEFAULT_NEWS_COUNT}条新闻")
+        # 如果找不到昨天的文件，返回最新编号减去DEFAULT_NEWS_COUNT（获取最近DEFAULT_NEWS_COUNT条新闻）
+        return max(1, latest_number - DEFAULT_NEWS_COUNT)  # 确保不会返回负数或0
+    except FileNotFoundError:
+        logging.info(f"昨天的文件 {yesterday_file} 不存在，将获取最新{DEFAULT_NEWS_COUNT}条新闻")
+        return max(1, latest_number - DEFAULT_NEWS_COUNT)
+    except json.JSONDecodeError as e:
+        logging.error(f"解析昨天文件 {yesterday_file} 时出错: {e}，将获取最新{DEFAULT_NEWS_COUNT}条新闻")
+        return max(1, latest_number - DEFAULT_NEWS_COUNT)
+    except PermissionError as e:
+        logging.error(f"读取昨天文件 {yesterday_file} 权限错误: {e}，将获取最新{DEFAULT_NEWS_COUNT}条新闻")
+        return max(1, latest_number - DEFAULT_NEWS_COUNT)
     except Exception as e:
-        print(f"读取昨天文件时出错: {e}，将获取最新30条新闻")
-        return max(1, latest_number - 30)  # 确保不会返回负数或0
+        logging.error(f"读取昨天文件 {yesterday_file} 时出错: {e}，将获取最新{DEFAULT_NEWS_COUNT}条新闻")
+        return max(1, latest_number - DEFAULT_NEWS_COUNT)
+
+# 生成新闻摘要
+async def get_news_summary(article_data: Dict[str, Any], client: OpenAI) -> str:
+    """使用OpenAI API生成新闻摘要"""
+    system_prompt = """
+    ## Goals
+    读取并解析单条新闻文章，提炼出文章的主旨，形成一句简洁的概述。
+
+    ## Constrains:
+    概述长度150字左右，保持文章的原意和重点。
+
+    ## Skills
+    文章内容理解和总结能力。
+
+    ## Output Format
+    一句话概述，简洁明了，不超过150字。
+
+    ## Workflow:
+    1. 理解文章标题和内容
+    2. 提取关键信息和主要观点
+    3. 生成一句简洁的概述，不超过150字
+    """
+
+    try:
+        # 使用asyncio.to_thread将同步调用转换为异步
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"内容：{article_data['content']}"}
+            ],
+            top_p=0.7,
+            temperature=0.1,
+            stream=False
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "authentication" in error_msg or "api key" in error_msg:
+            logging.error(f"API认证错误: {e}")
+            return f"无法生成摘要：API认证失败 - {article_data['title']}"
+        elif "rate limit" in error_msg or "quota" in error_msg:
+            logging.error(f"API速率限制错误: {e}")
+            return f"无法生成摘要：API请求频率过高 - {article_data['title']}"
+        else:
+            logging.error(f"摘要生成错误: {e}")
+            return f"无法生成摘要：{article_data['title']}"
 
 # 3. 开始提取ai咨询内容
-async def main():
-    print("开始提取文章数据...")
+async def main() -> None:
+    logging.info("开始提取文章数据...")
     
     # 获取最新文章编号
-    number = extract_snumber_from_url("https://www.aibase.com/zh/news")
+    number = extract_snumber_from_url(BASE_URL)
+    if number is None:
+        logging.error("无法获取最新文章编号，程序退出")
+        return
     
     # 获取当前时间并格式化为文件名
     current_time = datetime.now().strftime("%Y_%m_%d")
     
-    # 获取当前脚本所在目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_name = os.path.join(current_dir, f"{current_time}.json")
+    file_name = os.path.join(JSON_DIR, f"{current_time}.json")
     
     # 从昨天的文件中获取起始编号
     yesterday_last_number = get_yesterday_last_number(number)
     
-    all_news_data = []  # 添加这行来存储所有数据
-    
+    # 并行爬取所有新闻
+    logging.info(f"开始并行爬取 {number - yesterday_last_number + 1} 条新闻...")
+    tasks = []
     for i in range(yesterday_last_number, number + 1):
-        print(f"正在提取咨询编号: {i}")
-        article_data = await extract_ai_news_article(i)
-        
-        if article_data:  # 添加这个检查
-            article_data['news_id'] = i  # 添加新闻ID
-            all_news_data.append(article_data)  # 添加到列表中
+        tasks.append(extract_ai_news_article(i))
+    
+    # 执行所有爬取任务
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # 处理爬取结果
+    all_news_data: List[Dict[str, Any]] = []
+    for i, result in enumerate(results, start=yesterday_last_number):
+        if isinstance(result, Exception):
+            logging.error(f"爬取新闻 {i} 失败: {result}")
+        elif result:
+            result['news_id'] = i  # 添加新闻ID
+            all_news_data.append(result)  # 添加到列表中
+        else:
+            logging.warning(f"爬取新闻 {i} 无内容")
 
     # 在循环结束后添加保存代码（需要更改为每天的日期作为文件名）
     with open(file_name, 'w', encoding='utf-8') as f:
         json.dump(all_news_data, f, ensure_ascii=False, indent=2)
 
-    print(f"已保存 {len(all_news_data)} 条新闻到 {file_name}")
+    logging.info(f"已保存 {len(all_news_data)} 条新闻到 {file_name}")
     
     # 4. 将提取好的json数据做摘要
     load_dotenv()
-    # api_key = os.getenv("ZHIPU_API_KEY")
-    api_key = os.getenv("MEITUAN_API_KEY")
+    api_key = os.getenv(API_KEY_ENV_VAR)
     
     # 检查API密钥是否存在
     if not api_key:
-        print("警告: 未找到ZHIPU_API_KEY环境变量，将跳过摘要生成")
+        logging.warning(f"未找到{API_KEY_ENV_VAR}环境变量，将跳过摘要生成")
         summaries = ["无法生成摘要：未配置API密钥 或密钥错误 (建议debug下密钥，有可能只是之前设置为系统变量了)"]
     else:
-        def get_news_summary(article_data):
-            client = OpenAI(
-                api_key=api_key,
-                # base_url="https://open.bigmodel.cn/api/paas/v4/"
-                base_url="https://api.longcat.chat/openai"
-            )
-
-            system_prompt = """
-            ## Goals
-            读取并解析单条新闻文章，提炼出文章的主旨，形成一句简洁的概述。
-
-            ## Constrains:
-            概述长度150字左右，保持文章的原意和重点。
-
-            ## Skills
-            文章内容理解和总结能力。
-
-            ## Output Format
-            一句话概述，简洁明了，不超过150字。
-
-            ## Workflow:
-            1. 理解文章标题和内容
-            2. 提取关键信息和主要观点
-            3. 生成一句简洁的概述，不超过150字
-            """
-
-            try:
-                response = client.chat.completions.create(
-                    # model="glm-4.5-flash",
-                    model="LongCat-Flash-Chat",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"内容：{article_data['content']}"}
-                    ],
-                    top_p=0.7,
-                    temperature=0.1,
-                    stream=False
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                print(f"摘要生成错误: {e}")
-                return f"无法生成摘要：{article_data['title']}"
+        # 初始化OpenAI客户端
+        client = OpenAI(
+            api_key=api_key,
+            base_url=API_BASE_URL
+        )
         
-        # 为每条新闻生成摘要
-        summaries = []
-        for i, article in enumerate(all_news_data):
-            print(f"正在生成第 {i+1}/{len(all_news_data)} 条新闻摘要...")
-            summary = get_news_summary(article)
-            summaries.append(summary)
+        # 并行生成所有新闻摘要
+        logging.info(f"开始并行生成 {len(all_news_data)} 条新闻摘要...")
+        summary_tasks = []
+        for article in all_news_data:
+            summary_tasks.append(get_news_summary(article, client))
+        
+        # 执行所有摘要生成任务
+        summaries: List[str] = await asyncio.gather(*summary_tasks, return_exceptions=True)
+        
+        # 处理异常结果并将摘要添加到新闻数据中
+        for i, summary in enumerate(summaries):
+            if isinstance(summary, Exception):
+                logging.error(f"生成第 {i+1} 条新闻摘要失败: {summary}")
+                summaries[i] = f"无法生成摘要：{all_news_data[i]['title']}"
+            # 将摘要添加到对应的新闻数据中
+            all_news_data[i]['summary'] = summaries[i]
+        
+        # 重新保存包含摘要的新闻数据到JSON文件
+        with open(file_name, 'w', encoding='utf-8') as f:
+            json.dump(all_news_data, f, ensure_ascii=False, indent=2)
+        logging.info(f"已更新 {len(all_news_data)} 条新闻的摘要到 {file_name}")
     
     # 将摘要好的数据写入到一个 .txt文件中
-    txt_file_name = os.path.join(current_dir, f"{current_time}_news_data.txt")
+    txt_file_name = os.path.join(TXT_DIR, f"{current_time}_news_data.txt")
     with open(txt_file_name, 'w', encoding='utf-8') as f:
         # 写入所有摘要，每条摘要占一行
         for summary in summaries:
