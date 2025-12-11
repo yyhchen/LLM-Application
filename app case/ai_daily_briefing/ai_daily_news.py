@@ -5,6 +5,7 @@ import json
 import asyncio
 import os
 import logging
+import random
 from typing import List, Dict, Optional, Any
 from crawl4ai import AsyncWebCrawler
 from datetime import datetime, timedelta
@@ -222,31 +223,41 @@ async def get_news_summary(article_data: Dict[str, Any], client: OpenAI) -> str:
     3. 生成一句简洁的概述，不超过150字
     """
 
-    try:
-        # 使用asyncio.to_thread将同步调用转换为异步
-        response = await asyncio.to_thread(
-            client.chat.completions.create,
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"内容：{article_data['content']}"}
-            ],
-            top_p=0.7,
-            temperature=0.1,
-            stream=False
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "authentication" in error_msg or "api key" in error_msg:
-            logging.error(f"API认证错误: {e}")
-            return f"无法生成摘要：API认证失败 - {article_data['title']}"
-        elif "rate limit" in error_msg or "quota" in error_msg:
-            logging.error(f"API速率限制错误: {e}")
-            return f"无法生成摘要：API请求频率过高 - {article_data['title']}"
-        else:
-            logging.error(f"摘要生成错误: {e}")
-            return f"无法生成摘要：{article_data['title']}"
+    max_retries = 3  # 最大重试次数
+    base_delay = 1  # 基础延迟（秒）
+    
+    for attempt in range(max_retries):
+        try:
+            # 使用asyncio.to_thread将同步调用转换为异步
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"内容：{article_data['content']}"}
+                ],
+                top_p=0.7,
+                temperature=0.1,
+                stream=False
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "authentication" in error_msg or "api key" in error_msg:
+                logging.error(f"API认证错误: {e}")
+                return f"无法生成摘要：API认证失败 - {article_data['title']}"
+            elif "rate limit" in error_msg or "quota" in error_msg:
+                if attempt < max_retries - 1:
+                    # 计算重试延迟（指数退避）
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)  # 添加随机抖动
+                    logging.warning(f"API速率限制，{delay:.2f}秒后重试（第{attempt+2}/{max_retries}次尝试）")
+                    await asyncio.sleep(delay)
+                else:
+                    logging.error(f"API速率限制错误，已达到最大重试次数: {e}")
+                    return f"无法生成摘要：API请求频率过高 - {article_data['title']}"
+            else:
+                logging.error(f"摘要生成错误: {e}")
+                return f"无法生成摘要：{article_data['title']}"
 
 # 3. 开始提取ai咨询内容
 async def main() -> None:
@@ -307,22 +318,47 @@ async def main() -> None:
             base_url=API_BASE_URL
         )
         
-        # 并行生成所有新闻摘要
-        logging.info(f"开始并行生成 {len(all_news_data)} 条新闻摘要...")
-        summary_tasks = []
-        for article in all_news_data:
-            summary_tasks.append(get_news_summary(article, client))
+        # 生成新闻摘要 - 控制并发数量以避免API限流
+        logging.info(f"开始生成 {len(all_news_data)} 条新闻摘要...")
         
-        # 执行所有摘要生成任务
-        summaries: List[str] = await asyncio.gather(*summary_tasks, return_exceptions=True)
+        # 根据免费API限流情况，设置合适的并发数量（免费API大约每分钟允许25-30次请求）
+        CONCURRENT_REQUESTS = 15  # 同时处理的请求数量
+        BATCH_DELAY = 2  # 每批次之间的延迟（秒）
         
-        # 处理异常结果并将摘要添加到新闻数据中
-        for i, summary in enumerate(summaries):
-            if isinstance(summary, Exception):
-                logging.error(f"生成第 {i+1} 条新闻摘要失败: {summary}")
-                summaries[i] = f"无法生成摘要：{all_news_data[i]['title']}"
-            # 将摘要添加到对应的新闻数据中
-            all_news_data[i]['summary'] = summaries[i]
+        summaries: List[str] = []
+        
+        # 分批处理请求
+        for i in range(0, len(all_news_data), CONCURRENT_REQUESTS):
+            batch_start = i
+            batch_end = min(i + CONCURRENT_REQUESTS, len(all_news_data))
+            batch_size = batch_end - batch_start
+            
+            logging.info(f"处理摘要批次 {i//CONCURRENT_REQUESTS + 1}：{batch_start + 1}-{batch_end}/{len(all_news_data)}")
+            
+            # 创建当前批次的任务
+            batch_tasks = []
+            for j in range(batch_start, batch_end):
+                batch_tasks.append(get_news_summary(all_news_data[j], client))
+            
+            # 执行当前批次的任务
+            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+            
+            # 处理当前批次的结果
+            for j, result in enumerate(batch_results):
+                idx = batch_start + j
+                if isinstance(result, Exception):
+                    logging.error(f"生成第 {idx+1} 条新闻摘要失败: {result}")
+                    summaries.append(f"无法生成摘要：{all_news_data[idx]['title']}")
+                else:
+                    summaries.append(result)
+                
+                # 将摘要添加到对应的新闻数据中
+                all_news_data[idx]['summary'] = summaries[idx]
+            
+            # 如果不是最后一批，添加延迟
+            if batch_end < len(all_news_data):
+                logging.info(f"批次完成，等待 {BATCH_DELAY} 秒后继续下一批次...")
+                await asyncio.sleep(BATCH_DELAY)
         
         # 重新保存包含摘要的新闻数据到JSON文件
         with open(file_name, 'w', encoding='utf-8') as f:
