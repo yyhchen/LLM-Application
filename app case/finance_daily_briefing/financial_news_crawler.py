@@ -526,7 +526,7 @@ class FinancialNewsCrawler:
 if __name__ == "__main__":
     # 测试爬虫
     crawler = FinancialNewsCrawler()
-    news_list = crawler.crawl(max_news=5)  # 只爬取5条新闻，防止被限制IP
+    news_list = crawler.crawl(max_news=30)  # 只爬取5条新闻，防止被限制IP
     
     # 保存新闻数据
     crawler._save_news(news_list)
