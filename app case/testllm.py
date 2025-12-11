@@ -15,7 +15,10 @@ completion = client.chat.completions.create(
         {"role": "user", "content": "请你作为童话故事大王，写一篇短篇童话故事"}
     ],
     top_p=0.7,
-    temperature=0.9
+    temperature=0.9,
+    stream=True
 )
 
-print(completion.choices[0].message.content)
+for chunk in completion:
+    if chunk.choices[0].delta.content is not None:
+        print(chunk.choices[0].delta.content, end="")
