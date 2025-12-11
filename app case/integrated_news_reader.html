@@ -600,6 +600,7 @@
         <div class="category-tabs">
             <button class="tab-btn active" data-category="ai">AI新闻</button>
             <button class="tab-btn" data-category="finance">财经新闻</button>
+            <button class="tab-btn" data-category="car">汽车新闻</button>
         </div>
 
         <!-- 日期控制区域 -->
@@ -714,8 +715,8 @@
             modalBody.innerHTML = '';
             
             // 根据新闻类型显示不同的模态框内容
-            if (currentCategory === 'finance') {
-                // 财经新闻模态框
+            if (currentCategory === 'finance' || currentCategory === 'car') {
+                // 财经新闻或汽车新闻模态框
                 const metaHtml = `
                     <div class="meta-item"><strong>来源</strong>: ${newsItem.source || '未知'}</div>
                     <div class="meta-item"><strong>发布时间</strong>: ${newsItem.publish_time ? new Date(newsItem.publish_time).toLocaleString('zh-CN') : '未知'}</div>
@@ -734,7 +735,7 @@
                     modalSummaryContainer.innerHTML = summaryHtml;
                 }
                 
-                modalBody.innerHTML = formatContent(newsItem.content || '', 'finance');
+                modalBody.innerHTML = formatContent(newsItem.content || '', currentCategory);
             } else {
                 // AI新闻模态框
                 if (newsItem.summary) {
@@ -832,12 +833,14 @@
                 const month = dateParts[1];
                 
                 // 根据分类构建文件路径
-                let jsonPath;
-                if (currentCategory === 'finance') {
-                    jsonPath = `finance_daily_briefing/data/json/${year}/${month}/${date}.json`;
-                } else {
-                    jsonPath = `ai_daily_briefing/data/json/${year}/${month}/${date}.json`;
-                }
+            let jsonPath;
+            if (currentCategory === 'finance') {
+                jsonPath = `finance_daily_briefing/data/json/${year}/${month}/${date}.json`;
+            } else if (currentCategory === 'car') {
+                jsonPath = `car_daily_briefing/data/json/${year}/${month}/${date}.json`;
+            } else {
+                jsonPath = `ai_daily_briefing/data/json/${year}/${month}/${date}.json`;
+            }
                 
                 // 尝试加载JSON数据
                 const jsonDataResponse = await fetch(jsonPath);
@@ -850,7 +853,7 @@
                     newsContainer.innerHTML = newsData.map(news => {
                         // 生成元标签
                         let metaHtml = '';
-                        if (currentCategory === 'finance') {
+                        if (currentCategory === 'finance' || currentCategory === 'car') {
                             metaHtml = `
                                 <span class="meta-tag">${news.source || '未知来源'}</span>
                                 <span class="meta-tag accent">${news.publish_time ? new Date(news.publish_time).toLocaleDateString('zh-CN') : '未知时间'}</span>
