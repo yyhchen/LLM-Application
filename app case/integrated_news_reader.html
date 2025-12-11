@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI每日新闻简报 - 整合版</title>
+    <style>
+        /* 基础样式重置与变量定义 */
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary-color: #64748b;
+            --accent-color: #06b6d4;
+            --bg-gradient-start: #f0f9ff;
+            --bg-gradient-end: #e0f2fe;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --border-radius-sm: 0.375rem;
+            --border-radius-md: 0.5rem;
+            --border-radius-lg: 0.75rem;
+            --border-radius-xl: 1rem;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --hover-lift: translateY(-4px);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.7;
+            color: var(--text-primary);
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* 容器样式 */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        /* 头部样式 */
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius-xl);
+            box-shadow: var(--shadow-md);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -0.025em;
+        }
+
+        .date {
+            color: var(--secondary-color);
+            font-size: 1.3rem;
+            font-weight: 500;
+        }
+
+        /* 分类切换区域 */
+        .category-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 0 auto 20px;
+            padding: 0 20px;
+            flex-wrap: wrap;
+            max-width: 800px;
+        }
+
+        .tab-btn {
+            padding: 12px 28px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-full, 9999px);
+            font-size: 1rem;
+            font-weight: 600;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            outline: none;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .tab-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .tab-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* 日期控制区样式 */
+        .date-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin: 0 auto 30px;
+            padding: 24px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
+            max-width: 800px;
+        }
+
+        .date-input {
+            padding: 12px 20px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-full, 9999px);
+            font-size: 1rem;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            outline: none;
+            transition: var(--transition);
+            min-width: 200px;
+        }
+
+        .date-input:focus {
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--border-radius-full, 9999px);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: var(--hover-lift);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+            transform: var(--hover-lift);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-accent {
+            background: var(--accent-color);
+        }
+
+        .btn-accent:hover {
+            background: #0891b2;
+            transform: var(--hover-lift);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .nav-btn {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 1.2rem;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* 新闻网格布局 */
+        .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 28px;
+            margin-top: 30px;
+        }
+
+        /* 新闻卡片样式 */
+        .news-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+        }
+
+        .news-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-xl);
+            border-color: var(--primary-color);
+        }
+
+        .card-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%);
+        }
+
+        .card-title {
+            color: var(--text-primary);
+            font-size: 1.4rem;
+            font-weight: 700;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 0.875rem;
+            color: var(--secondary-color);
+            flex-wrap: wrap;
+        }
+
+        .meta-tag {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary-color);
+            padding: 4px 12px;
+            border-radius: var(--border-radius-full, 9999px);
+            font-weight: 600;
+        }
+
+        .meta-tag.accent {
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--accent-color);
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        .card-content {
+            color: var(--text-secondary);
+            line-height: 1.75;
+            font-size: 0.975rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 6;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 加载状态样式 */
+        .loading, .no-news {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 30px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius-xl);
+            box-shadow: var(--shadow-md);
+            margin-top: 20px;
+        }
+
+        .loading h3, .no-news h3 {
+            color: var(--primary-color);
+            margin-bottom: 16px;
+            font-size: 1.5rem;
+        }
+
+        .loading p, .no-news p {
+            color: var(--secondary-color);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 5vh auto;
+            padding: 40px;
+            border-radius: var(--border-radius-xl);
+            box-shadow: var(--shadow-xl);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+            position: relative;
+            border: none;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .close {
+            color: var(--secondary-color);
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            font-size: 32px;
+            font-weight: 300;
+            cursor: pointer;
+            transition: var(--transition);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .close:hover, .close:focus {
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, 0.1);
+            transform: rotate(90deg);
+        }
+
+        .modal-content h2 {
+            color: var(--primary-color);
+            margin-bottom: 24px;
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.3;
+            padding-right: 40px;
+        }
+
+        .modal-content p {
+            line-height: 1.9;
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .modal-content .meta-info {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .modal-content .meta-item {
+            background: rgba(37, 99, 235, 0.05);
+            padding: 8px 16px;
+            border-radius: var(--border-radius-full, 9999px);
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+
+        .modal-content .meta-item strong {
+            color: var(--primary-color);
+            margin-right: 6px;
+        }
+
+        .modal-content .modal-summary {
+            background: rgba(6, 182, 212, 0.05);
+            border-left: 4px solid var(--accent-color);
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: var(--border-radius-md);
+        }
+
+        .modal-content .modal-summary h3 {
+            color: var(--accent-color);
+            margin-bottom: 12px;
+            font-size: 1.3rem;
+        }
+
+        .modal-content .modal-summary p {
+            margin: 0;
+            font-size: 1.05rem;
+            line-height: 1.8;
+        }
+
+        .modal-highlights {
+            color: var(--accent-color);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 30px 0 16px;
+        }
+
+        .modal-highlight-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 24px;
+        }
+
+        .modal-highlight-list li {
+            background: rgba(6, 182, 212, 0.05);
+            border-left: 4px solid var(--accent-color);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border-radius: 0 var(--border-radius-md) var(--border-radius-md) 0;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        /* 滚动条样式优化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* 动画效果 */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(37, 99, 235, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 12px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 工具提示样式 */
+        [title] {
+            position: relative;
+        }
+
+        [title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--text-primary);
+            color: white;
+            padding: 8px 12px;
+            border-radius: var(--border-radius-md);
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 8px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* 响应式设计优化 */
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .date {
+                font-size: 1.1rem;
+            }
+
+            .news-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .date-controls {
+                flex-direction: column;
+                gap: 12px;
+                padding: 20px;
+            }
+
+            .category-tabs {
+                gap: 8px;
+                padding: 0 10px;
+            }
+
+            .tab-btn {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+
+            .date-input {
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 30px 24px;
+                margin: 3vh auto;
+            }
+
+            .modal-content h2 {
+                font-size: 1.6rem;
+            }
+
+            .modal-content p {
+                font-size: 1rem;
+            }
+
+            header {
+                padding: 30px 16px;
+            }
+
+            .card-header {
+                padding: 20px;
+            }
+
+            .card-body {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 页面头部 -->
+        <header>
+            <h1>AI每日新闻简报</h1>
+            <div class="date" id="current-date">加载中...</div>
+        </header>
+
+        <!-- 分类切换区域 -->
+        <div class="category-tabs">
+            <button class="tab-btn active" data-category="ai">AI新闻</button>
+            <button class="tab-btn" data-category="finance">财经新闻</button>
+        </div>
+
+        <!-- 日期控制区域 -->
+        <div class="date-controls">
+            <button class="btn nav-btn" id="prev-day" onclick="navigateDate(-1)" title="前一天">
+                ←
+            </button>
+            <input type="date" class="date-input" id="date-picker" onchange="loadNewsForDate()">
+            <button class="btn nav-btn" id="next-day" onclick="navigateDate(1)" title="后一天">
+                →
+            </button>
+            <button class="btn btn-accent" onclick="goToToday()" title="回到今天">
+                <span>今天</span>
+            </button>
+            <button class="btn btn-primary" onclick="loadNews()" title="刷新">
+                <span>刷新</span>
+            </button>
+        </div>
+
+        <!-- 新闻内容区域 -->
+        <div class="news-grid" id="news-container">
+            <div class="loading">正在加载新闻</div>
+        </div>
+
+        <!-- 模态框用于显示完整内容 -->
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="modal-title"></h2>
+                <div class="meta-info" id="modal-meta"></div>
+                <div id="modal-summary-container"></div>
+                <div id="modal-body"></div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>AI每日新闻简报 &copy; 2025 | 使用AI技术自动收集整理</p>
+        </footer>
+    </div>
+
+    <script>
+        // 当前选择的分类和日期
+        let currentCategory = 'ai';
+        let currentDate = '';
+
+        // 获取当前日期并格式化（匹配Python脚本生成的文件名格式）
+        function getCurrentDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}_${month}_${day}`;
+        }
+
+        // 格式化显示日期
+        function formatDisplayDate(dateStr = null) {
+            const date = dateStr ? new Date(dateStr.replace(/_/g, '-')) : new Date();
+            const options = { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                weekday: 'long'
+            };
+            return date.toLocaleDateString('zh-CN', options);
+        }
+
+        // 智能排版内容
+        function formatContent(content, category) {
+            if (!content) return '<p>暂无内容</p>';
+            
+            let formattedContent = content;
+            
+            // 分段处理
+            formattedContent = formattedContent.replace(/\n+/g, '</p><p>');
+            
+            // 如果是AI新闻，处理划重点部分
+            if (category === 'ai') {
+                if (formattedContent.includes('划重点:')) {
+                    formattedContent = formattedContent.replace(/划重点:/g, '</p><h3 class="modal-highlights">划重点:</h3><ul class="modal-highlight-list">');
+                    formattedContent += '</ul>';
+                }
+                
+                // 处理🌟标记的项目
+                formattedContent = formattedContent.replace(/🌟\s*([^<]+)/g, '<li>⭐ $1</li>');
+                formattedContent = formattedContent.replace(/📌\s*([^<]+)/g, '<li>📍 $1</li>');
+                formattedContent = formattedContent.replace(/💡\s*([^<]+)/g, '<li>💡 $1</li>');
+                formattedContent = formattedContent.replace(/📅\s*([^<]+)/g, '<li>📅 $1</li>');
+            }
+            
+            // 添加开头和结尾标签
+            if (!formattedContent.startsWith('<h3') && !formattedContent.startsWith('<p')) {
+                formattedContent = `<p>${formattedContent}</p>`;
+            }
+            
+            return formattedContent;
+        }
+        
+        // 显示模态框
+        function showModal(newsItem) {
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMeta = document.getElementById('modal-meta');
+            const modalSummaryContainer = document.getElementById('modal-summary-container');
+            const modalBody = document.getElementById('modal-body');
+            
+            modalTitle.textContent = newsItem.title;
+            
+            // 清空模态框内容
+            modalMeta.innerHTML = '';
+            modalSummaryContainer.innerHTML = '';
+            modalBody.innerHTML = '';
+            
+            // 根据新闻类型显示不同的模态框内容
+            if (currentCategory === 'finance') {
+                // 财经新闻模态框
+                const metaHtml = `
+                    <div class="meta-item"><strong>来源</strong>: ${newsItem.source || '未知'}</div>
+                    <div class="meta-item"><strong>发布时间</strong>: ${newsItem.publish_time ? new Date(newsItem.publish_time).toLocaleString('zh-CN') : '未知'}</div>
+                    ${newsItem.author ? `<div class="meta-item"><strong>作者</strong>: ${newsItem.author}</div>` : ''}
+                    ${newsItem.url ? `<div class="meta-item"><strong>链接</strong>: <a href="${newsItem.url}" target="_blank" style="color: var(--primary-color); text-decoration: none;">查看原文</a></div>` : ''}
+                `;
+                modalMeta.innerHTML = metaHtml;
+                
+                if (newsItem.summary) {
+                    const summaryHtml = `
+                        <div class="modal-summary">
+                            <h3>摘要</h3>
+                            <p>${newsItem.summary}</p>
+                        </div>
+                    `;
+                    modalSummaryContainer.innerHTML = summaryHtml;
+                }
+                
+                modalBody.innerHTML = formatContent(newsItem.content || '', 'finance');
+            } else {
+                // AI新闻模态框
+                modalBody.innerHTML = formatContent(newsItem.content || '', 'ai');
+            }
+            
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        }
+
+        // 关闭模态框
+        function setupModal() {
+            const modal = document.getElementById('modal');
+            const span = document.getElementsByClassName('close')[0];
+            
+            // 点击关闭按钮关闭模态框
+            span.onclick = function() {
+                modal.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+            
+            // 点击模态框外部关闭
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            }
+            
+            // 按ESC键关闭模态框
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && modal.style.display === 'block') {
+                    modal.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+
+        // 设置分类切换功能
+        function setupCategoryTabs() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 更新活动状态
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 更新当前分类
+                    currentCategory = this.dataset.category;
+                    
+                    // 重新加载新闻
+                    loadNews();
+                });
+            });
+        }
+
+        // 加载新闻数据
+        async function loadNews() {
+            const datePicker = document.getElementById('date-picker');
+            const selectedDate = datePicker.value;
+            const date = selectedDate ? selectedDate.replace(/-/g, '_') : getCurrentDate();
+            
+            await loadNewsForSpecificDate(date);
+        }
+
+        // 为特定日期加载新闻
+        async function loadNewsForSpecificDate(date) {
+            const newsContainer = document.getElementById('news-container');
+            const currentDateElement = document.getElementById('current-date');
+            
+            // 更新日期显示
+            const displayDate = formatDisplayDate(date);
+            currentDateElement.textContent = displayDate;
+            currentDate = date;
+            
+            // 显示加载状态
+            newsContainer.innerHTML = '<div class="loading">正在加载新闻</div>';
+            
+            try {
+                // 解析日期，获取年份和月份
+                const dateParts = date.split('_');
+                if (dateParts.length !== 3) {
+                    throw new Error('日期格式错误');
+                }
+                const year = dateParts[0];
+                const month = dateParts[1];
+                
+                // 根据分类构建文件路径
+                let jsonPath;
+                if (currentCategory === 'finance') {
+                    jsonPath = `finance_daily_briefing/data/json/${year}/${month}/${date}.json`;
+                } else {
+                    jsonPath = `ai_daily_briefing/data/json/${year}/${month}/${date}.json`;
+                }
+                
+                // 尝试加载JSON数据
+                const jsonDataResponse = await fetch(jsonPath);
+                if (!jsonDataResponse.ok) throw new Error('JSON数据文件未找到');
+                
+                const newsData = await jsonDataResponse.json();
+                
+                // 渲染新闻卡片
+                if (newsData && newsData.length > 0) {
+                    newsContainer.innerHTML = newsData.map(news => {
+                        // 生成元标签
+                        let metaHtml = '';
+                        if (currentCategory === 'finance') {
+                            metaHtml = `
+                                <span class="meta-tag">${news.source || '未知来源'}</span>
+                                <span class="meta-tag accent">${news.publish_time ? new Date(news.publish_time).toLocaleDateString('zh-CN') : '未知时间'}</span>
+                            `;
+                        } else {
+                            metaHtml = `
+                                <span class="meta-tag">ID: ${news.news_id || 'N/A'}</span>
+                                <span class="meta-tag accent">${news.category || '未分类'}</span>
+                            `;
+                        }
+                        
+                        return `
+                        <div class="news-card" onclick="showModal(${JSON.stringify(news).replace(/"/g, '&quot;')})")>
+                            <div class="card-header">
+                                <h3 class="card-title">${news.title || '无标题'}</h3>
+                                <div class="card-meta">
+                                    ${metaHtml}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="card-content">
+                                    ${news.summary || news.content || '暂无内容'}
+                                </div>
+                            </div>
+                        </div>
+                    `}).join('');
+                } else {
+                    newsContainer.innerHTML = `
+                        <div class="no-news">
+                            <h3>今日暂无新闻</h3>
+                            <p>请尝试选择其他日期或稍后再试</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载新闻失败:', error);
+                newsContainer.innerHTML = `
+                    <div class="no-news">
+                        <h3>加载失败</h3>
+                        <p>请确保已运行新闻爬取程序生成数据文件</p>
+                        <p style="color: #ef4444;">错误信息: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 格式化日期用于显示
+        function formatDateForDisplay(dateStr) {
+            const parts = dateStr.split('_');
+            if (parts.length === 3) {
+                const date = new Date(parts[0], parts[1] - 1, parts[2]);
+                const options = { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    weekday: 'long'
+                };
+                return date.toLocaleDateString('zh-CN', options);
+            }
+            return formatDisplayDate();
+        }
+
+        // 日期导航功能
+        function navigateDate(days) {
+            const datePicker = document.getElementById('date-picker');
+            const currentDate = datePicker.value ? new Date(datePicker.value) : new Date();
+            
+            currentDate.setDate(currentDate.getDate() + days);
+            
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+            const day = String(currentDate.getDate()).padStart(2, '0');
+            
+            datePicker.value = `${year}-${month}-${day}`;
+            loadNewsForDate();
+        }
+
+        // 回到今天
+        function goToToday() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            
+            document.getElementById('date-picker').value = `${year}-${month}-${day}`;
+            loadNewsForDate();
+        }
+
+        // 当日期选择器改变时加载新闻
+        function loadNewsForDate() {
+            const datePicker = document.getElementById('date-picker');
+            const selectedDate = datePicker.value;
+            
+            if (selectedDate) {
+                const formattedDate = selectedDate.replace(/-/g, '_');
+                loadNewsForSpecificDate(formattedDate);
+                updateNavigationButtons();
+            }
+        }
+
+        // 更新导航按钮状态
+        function updateNavigationButtons() {
+            const datePicker = document.getElementById('date-picker');
+            const nextBtn = document.getElementById('next-day');
+            const today = new Date();
+            const selectedDate = new Date(datePicker.value);
+            
+            // 如果选择的日期是今天或之后，禁用"后一天"按钮
+            if (selectedDate >= today) {
+                nextBtn.disabled = true;
+            } else {
+                nextBtn.disabled = false;
+            }
+        }
+
+        // 初始化日期选择器
+        function initializeDatePicker() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            
+            document.getElementById('date-picker').value = `${year}-${month}-${day}`;
+            updateNavigationButtons();
+        }
+
+        // 页面加载完成后自动加载新闻
+        document.addEventListener('DOMContentLoaded', function() {
+            setupModal();
+            setupCategoryTabs();
+            initializeDatePicker();
+            loadNews();
+        });
+    </script>
+</body>
+</html>
