@@ -415,6 +415,8 @@ class FinancialNewsCrawler:
         3. 生成一句简洁的概述，不超过150字
         """
 
+        article_title = article_data['title']
+        
         for attempt in range(self.max_summary_retries):
             try:
                 # 调用OpenAI API生成摘要
@@ -431,21 +433,56 @@ class FinancialNewsCrawler:
                 return response.choices[0].message.content
             except Exception as e:
                 error_msg = str(e).lower()
-                if "authentication" in error_msg or "api key" in error_msg:
-                    logger.error(f"API认证错误: {e}")
-                    return f"无法生成摘要：API认证失败 - {article_data['title']}"
+                error_type = "未知错误"
+                
+                # 详细错误类型判断
+                if isinstance(e, client._exceptions.APIError):
+                    error_type = "API错误"
+                elif isinstance(e, client._exceptions.AuthenticationError):
+                    error_type = "认证错误"
+                elif isinstance(e, client._exceptions.PermissionError):
+                    error_type = "权限错误"
+                elif isinstance(e, client._exceptions.RateLimitError):
+                    error_type = "速率限制错误"
+                elif isinstance(e, client._exceptions.APIConnectionError):
+                    error_type = "连接错误"
+                elif isinstance(e, client._exceptions.Timeout):
+                    error_type = "超时错误"
+                elif "authentication" in error_msg or "api key" in error_msg:
+                    error_type = "认证错误"
                 elif "rate limit" in error_msg or "quota" in error_msg:
+                    error_type = "速率限制错误"
+                elif "timeout" in error_msg:
+                    error_type = "超时错误"
+                elif "connection" in error_msg or "network" in error_msg:
+                    error_type = "网络连接错误"
+                
+                logger.error(f"摘要生成错误（{error_type}）：{e}，文章标题：{article_title}，尝试次数：{attempt+1}/{self.max_summary_retries}")
+                
+                # 根据错误类型决定是否重试
+                if error_type == "认证错误" or error_type == "权限错误":
+                    # 不可恢复的错误，直接返回
+                    return f"无法生成摘要：API认证/权限失败 - {article_title}"
+                elif error_type == "速率限制错误" or error_type == "连接错误" or error_type == "超时错误":
+                    # 可恢复的错误，进行重试
                     if attempt < self.max_summary_retries - 1:
                         # 计算重试延迟（指数退避）
                         delay = self.base_summary_delay * (2 ** attempt) + random.uniform(0, 1)  # 添加随机抖动
-                        logger.warning(f"API速率限制，{delay:.2f}秒后重试（第{attempt+2}/{self.max_summary_retries}次尝试）")
+                        logger.warning(f"API{error_type}，{delay:.2f}秒后重试（第{attempt+2}/{self.max_summary_retries}次尝试），文章标题：{article_title}")
                         time.sleep(delay)
                     else:
-                        logger.error(f"API速率限制错误，已达到最大重试次数: {e}")
-                        return f"无法生成摘要：API请求频率过高 - {article_data['title']}"
+                        logger.error(f"API{error_type}，已达到最大重试次数，文章标题：{article_title}")
+                        return f"无法生成摘要：API{error_type} - {article_title}"
                 else:
-                    logger.error(f"摘要生成错误: {e}")
-                    return f"无法生成摘要：{article_data['title']}"
+                    # 其他错误，根据尝试次数决定是否重试
+                    if attempt < self.max_summary_retries - 1:
+                        # 计算重试延迟（指数退避）
+                        delay = self.base_summary_delay * (2 ** attempt) + random.uniform(0, 1)  # 添加随机抖动
+                        logger.warning(f"摘要生成{error_type}，{delay:.2f}秒后重试（第{attempt+2}/{self.max_summary_retries}次尝试），文章标题：{article_title}")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"摘要生成{error_type}，已达到最大重试次数，文章标题：{article_title}")
+                        return f"无法生成摘要：{error_type} - {article_title}"
     
     def _save_news(self, news_list: List[Dict]) -> None:
         """
@@ -480,14 +517,101 @@ class FinancialNewsCrawler:
                 base_url=self.api_base_url
             )
             
-            # 生成新闻摘要
+            # 生成新闻摘要 - 控制并发数量以避免API限流
             logger.info(f"开始生成 {len(news_list)} 条新闻摘要...")
             
-            for i, news in enumerate(news_list):
-                logger.info(f"正在生成第 {i+1}/{len(news_list)} 条新闻摘要...")
-                summary = self._get_news_summary(news, client)
-                summaries.append(summary)
-                news['summary'] = summary
+            # 根据免费API限流情况，设置合适的并发数量（免费API大约每分钟允许25-30次请求）
+            CONCURRENT_REQUESTS = 10  # 同时处理的请求数量，降低并发以减少429错误
+            BATCH_DELAY = 5  # 每批次之间的延迟（秒），增加延迟以避免API限流
+            RETRY_BATCH_DELAY = 60  # 重试批次之间的延迟（秒），给予API更多恢复时间
+            
+            summaries: List[str] = []
+            
+            # 初始化摘要列表
+            for _ in range(len(news_list)):
+                summaries.append("")
+            
+            # 分批处理请求
+            for i in range(0, len(news_list), CONCURRENT_REQUESTS):
+                batch_start = i
+                batch_end = min(i + CONCURRENT_REQUESTS, len(news_list))
+                batch_size = batch_end - batch_start
+                
+                logger.info(f"处理摘要批次 {i//CONCURRENT_REQUESTS + 1}：{batch_start + 1}-{batch_end}/{len(news_list)}")
+                
+                # 处理当前批次的新闻
+                for j in range(batch_start, batch_end):
+                    idx = j
+                    logger.info(f"正在生成第 {idx+1}/{len(news_list)} 条新闻摘要...")
+                    summary = self._get_news_summary(news_list[idx], client)
+                    summaries[idx] = summary
+                    news_list[idx]['summary'] = summary
+                
+                # 如果不是最后一批，添加延迟
+                if batch_end < len(news_list):
+                    logger.info(f"批次完成，等待 {BATCH_DELAY} 秒后继续下一批次...")
+                    time.sleep(BATCH_DELAY)
+            
+            # 保存当前结果到JSON文件（临时保存）
+            temp_json_file = os.path.join(self.json_dir, f"{current_time}_temp.json")
+            with open(temp_json_file, 'w', encoding='utf-8') as f:
+                json.dump(news_list, f, ensure_ascii=False, indent=2, default=str)
+            logger.info(f"已临时保存 {len(news_list)} 条新闻到 {temp_json_file}")
+            
+            # 收集生成失败的摘要索引
+            failed_indices = []
+            for idx, summary in enumerate(summaries):
+                if summary.startswith("无法生成摘要："):
+                    failed_indices.append(idx)
+            
+            # 实现失败摘要的重试机制
+            max_retry_rounds = 2  # 最多重试2轮
+            retry_round = 0
+            
+            while failed_indices and retry_round < max_retry_rounds:
+                retry_round += 1
+                logger.info(f"开始第 {retry_round}/{max_retry_rounds} 轮摘要重试，待重试 {len(failed_indices)} 条")
+                
+                # 等待更长时间，给API更多恢复时间
+                logger.info(f"重试前等待 {RETRY_BATCH_DELAY} 秒...")
+                time.sleep(RETRY_BATCH_DELAY)
+                
+                # 分批重试失败的摘要
+                current_failed_indices = failed_indices.copy()
+                failed_indices.clear()
+                
+                for i in range(0, len(current_failed_indices), CONCURRENT_REQUESTS):
+                    batch_start = i
+                    batch_end = min(i + CONCURRENT_REQUESTS, len(current_failed_indices))
+                    batch_size = batch_end - batch_start
+                    
+                    logger.info(f"处理重试批次 {i//CONCURRENT_REQUESTS + 1}：{batch_start + 1}-{batch_end}/{len(current_failed_indices)}")
+                    
+                    # 处理当前批次的重试
+                    for j in range(batch_start, batch_end):
+                        actual_idx = current_failed_indices[j]
+                        logger.info(f"正在重试生成第 {actual_idx+1}/{len(news_list)} 条新闻摘要...")
+                        summary = self._get_news_summary(news_list[actual_idx], client)
+                        if summary.startswith("无法生成摘要："):
+                            failed_indices.append(actual_idx)  # 保留到下一轮重试
+                        else:
+                            summaries[actual_idx] = summary
+                            news_list[actual_idx]['summary'] = summary
+                    
+                    # 如果不是最后一批，添加延迟
+                    if batch_end < len(current_failed_indices):
+                        logger.info(f"重试批次完成，等待 {BATCH_DELAY} 秒后继续下一批次...")
+                        time.sleep(BATCH_DELAY)
+                
+                # 保存当前重试结果到JSON文件
+                with open(temp_json_file, 'w', encoding='utf-8') as f:
+                    json.dump(news_list, f, ensure_ascii=False, indent=2, default=str)
+                logger.info(f"已更新第 {retry_round} 轮重试后的摘要到 {temp_json_file}")
+            
+            if failed_indices:
+                logger.warning(f"摘要生成完成，但仍有 {len(failed_indices)} 条无法生成摘要")
+            else:
+                logger.info("所有摘要生成成功！")
             
             logger.info(f"摘要生成完成")
         
