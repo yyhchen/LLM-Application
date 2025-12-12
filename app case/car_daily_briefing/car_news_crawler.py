@@ -116,8 +116,8 @@ class CarNewsCrawler:
             # 更新User-Agent
             self._update_user_agent()
             
-            # 获取新闻列表
-            news_links = self._get_news_links()
+            # 获取新闻列表，传递max_news参数
+            news_links = self._get_news_links(max_news)
             logger.info(f"获取到{len(news_links)}条新闻链接")
             
             # 检查新闻链接数量
@@ -172,79 +172,114 @@ class CarNewsCrawler:
         logger.info(f"爬取完成，共获取{len(news_list)}条新闻")
         return news_list
     
-    def _get_news_links(self) -> List[str]:
+    def _get_news_links(self, max_links: int = 30) -> List[str]:
         """
         获取新闻列表链接
         
+        Args:
+            max_links: 最大获取链接数量
+            
         Returns:
             新闻链接列表
         """
         news_links = []
+        page = 1
         
         try:
-            response = self.session.get(self.NEWS_URL, timeout=self.timeout)
-            response.raise_for_status()
-            
-            # 优化编码处理，使用chardet自动检测编码
-            import chardet
-            detected_encoding = chardet.detect(response.content)['encoding']
-            logger.debug(f"检测到编码：{detected_encoding}")
-            
-            # 使用检测到的编码，若检测失败则使用gbk作为 fallback
-            response.encoding = detected_encoding or 'gbk'
-            
-            # 直接使用response.content解码，确保编码正确
-            html_content = response.content.decode(response.encoding, errors='replace')
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # 查找新闻链接，汽车之家新闻频道的新闻链接通常在特定的class中
-            # 主要新闻区域
-            main_news = soup.find('div', class_='news-wrap')
-            if main_news:
-                links = main_news.find_all('a', href=True)
-                for link in links:
-                    href = link.get('href')
-                    # 过滤出新闻链接，汽车之家的新闻链接通常以/news/开头
-                    if href and '/news/' in href:
-                        # 补全绝对URL，但避免重复拼接
-                        if href.startswith('http'):
-                            # 已经是完整URL，直接使用
-                            full_url = href
-                        elif href.startswith('//'):
-                            # 协议相对URL，添加https:
-                            full_url = 'https:' + href
-                        elif href.startswith('/'):
-                            # 相对URL，拼接BASE_URL
-                            full_url = self.BASE_URL + href
-                        else:
-                            # 其他相对路径，暂不处理
-                            continue
-                        # 去重
-                        if full_url not in news_links:
-                            news_links.append(full_url)
-            
-            # 新闻列表区域
-            news_list = soup.find('ul', class_='article')
-            if news_list:
-                links = news_list.find_all('a', href=True)
-                for link in links:
-                    href = link.get('href')
-                    if href and '/news/' in href:
-                        # 补全绝对URL，但避免重复拼接
-                        if href.startswith('http'):
-                            # 已经是完整URL，直接使用
-                            full_url = href
-                        elif href.startswith('//'):
-                            # 协议相对URL，添加https:
-                            full_url = 'https:' + href
-                        elif href.startswith('/'):
-                            # 相对URL，拼接BASE_URL
-                            full_url = self.BASE_URL + href
-                        else:
-                            # 其他相对路径，暂不处理
-                            continue
-                        if full_url not in news_links:
-                            news_links.append(full_url)
+            while len(news_links) < max_links:
+                # 构造分页URL
+                if page == 1:
+                    url = self.NEWS_URL
+                else:
+                    url = f"{self.NEWS_URL}{page}/"
+                
+                logger.info(f"正在获取第{page}页新闻链接...")
+                
+                response = self.session.get(url, timeout=self.timeout)
+                response.raise_for_status()
+                
+                # 优化编码处理，使用chardet自动检测编码
+                import chardet
+                detected_encoding = chardet.detect(response.content)['encoding']
+                logger.debug(f"检测到编码：{detected_encoding}")
+                
+                # 使用检测到的编码，若检测失败则使用gbk作为 fallback
+                response.encoding = detected_encoding or 'gbk'
+                
+                # 直接使用response.content解码，确保编码正确
+                html_content = response.content.decode(response.encoding, errors='replace')
+                soup = BeautifulSoup(html_content, 'html.parser')
+                
+                # 查找新闻链接，汽车之家新闻频道的新闻链接通常在特定的class中
+                # 主要新闻区域
+                main_news = soup.find('div', class_='news-wrap')
+                if main_news:
+                    links = main_news.find_all('a', href=True)
+                    for link in links:
+                        href = link.get('href')
+                        # 过滤出新闻链接，汽车之家的新闻链接通常以/news/开头
+                        if href and '/news/' in href:
+                            # 补全绝对URL，但避免重复拼接
+                            if href.startswith('http'):
+                                # 已经是完整URL，直接使用
+                                full_url = href
+                            elif href.startswith('//'):
+                                # 协议相对URL，添加https:
+                                full_url = 'https:' + href
+                            elif href.startswith('/'):
+                                # 相对URL，拼接BASE_URL
+                                full_url = self.BASE_URL + href
+                            else:
+                                # 其他相对路径，暂不处理
+                                continue
+                            # 去重
+                            if full_url not in news_links:
+                                news_links.append(full_url)
+                                # 检查是否已达到最大数量
+                                if len(news_links) >= max_links:
+                                    logger.info(f"已获取到{max_links}条新闻链接，停止获取")
+                                    return news_links
+                
+                # 新闻列表区域
+                news_list = soup.find('ul', class_='article')
+                if news_list:
+                    links = news_list.find_all('a', href=True)
+                    for link in links:
+                        href = link.get('href')
+                        if href and '/news/' in href:
+                            # 补全绝对URL，但避免重复拼接
+                            if href.startswith('http'):
+                                # 已经是完整URL，直接使用
+                                full_url = href
+                            elif href.startswith('//'):
+                                # 协议相对URL，添加https:
+                                full_url = 'https:' + href
+                            elif href.startswith('/'):
+                                # 相对URL，拼接BASE_URL
+                                full_url = self.BASE_URL + href
+                            else:
+                                # 其他相对路径，暂不处理
+                                continue
+                            if full_url not in news_links:
+                                news_links.append(full_url)
+                                # 检查是否已达到最大数量
+                                if len(news_links) >= max_links:
+                                    logger.info(f"已获取到{max_links}条新闻链接，停止获取")
+                                    return news_links
+                
+                # 检查是否还有下一页
+                next_page = soup.find('a', text=re.compile(r'下一页|Next'))
+                if not next_page:
+                    logger.info("未找到下一页，停止获取")
+                    break
+                
+                # 增加页码，继续获取下一页
+                page += 1
+                
+                # 页面间添加延时，避免请求过快
+                sleep_time = random.uniform(self.min_sleep_time, self.max_sleep_time)
+                logger.debug(f"等待 {sleep_time:.2f} 秒后获取下一页...")
+                time.sleep(sleep_time)
         except Exception as e:
             logger.error(f"获取新闻列表失败：{e}")
         
@@ -638,7 +673,6 @@ class CarNewsCrawler:
             for i in range(0, len(news_list), CONCURRENT_REQUESTS):
                 batch_start = i
                 batch_end = min(i + CONCURRENT_REQUESTS, len(news_list))
-                batch_size = batch_end - batch_start
                 
                 logger.info(f"处理摘要批次 {i//CONCURRENT_REQUESTS + 1}：{batch_start + 1}-{batch_end}/{len(news_list)}")
                 
@@ -686,7 +720,6 @@ class CarNewsCrawler:
                 for i in range(0, len(current_failed_indices), CONCURRENT_REQUESTS):
                     batch_start = i
                     batch_end = min(i + CONCURRENT_REQUESTS, len(current_failed_indices))
-                    batch_size = batch_end - batch_start
                     
                     logger.info(f"处理重试批次 {i//CONCURRENT_REQUESTS + 1}：{batch_start + 1}-{batch_end}/{len(current_failed_indices)}")
                     
